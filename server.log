@@ -1,0 +1,24 @@
+2026-07-15 23:55:20,713 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:20,713 [camera_service] INFO: Camera capture started: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:23,189 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:23,189 [detector] INFO: Loading YOLO segment model: models/weights.pt on cuda:0 (half=True)
+2026-07-15 23:55:23,353 [detector] INFO: YOLO segment model loaded on cuda:0
+2026-07-15 23:55:24,032 [patch_core] INFO: PatchCore loaded: coreset torch.Size([43982, 1536]), img_size=224, k=9
+2026-07-15 23:55:24,085 [efficient_ad] INFO: EfficientAD loaded from models/efficientad_can.pth on cuda:0
+2026-07-15 23:55:25,220 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:27,088 [main] WARNING: ESP not available, running without conveyor
+[ERROR] Cannot connect: timed out
+INFO:     Started server process [17689]
+INFO:     Waiting for application startup.
+2026-07-15 23:55:27,120 [main] INFO: System started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
+2026-07-15 23:55:27,270 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:29,317 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:31,367 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+2026-07-15 23:55:33,413 [camera_service] INFO: Connected to camera: rtsp://admin:L27B3642@192.168.1.6:554/cam/realmonitor?channel=1&subtype=0
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-07-15 23:55:34,139 [main] INFO: System stopped
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17689]

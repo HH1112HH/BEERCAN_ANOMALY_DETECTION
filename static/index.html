@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Industrial Defect Detection System</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Industrial Defect Detection System</h1>
+    <div class="header-controls">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="tab" onclick="switchTab('settings')">Settings</button>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="resetCounters()">Reset</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Video Section -->
+    <div class="video-section">
+      <div class="video-header">
+        <h2>📷 Live Camera Feed</h2>
+        <span id="fps-display" style="font-size:13px;color:#38bdf8;font-weight:600;">0 FPS</span>
+      </div>
+      <div class="stream-container">
+        <img id="video-stream" src="/video" alt="Live Stream">
+        <div class="placeholder" id="placeholder" style="display:none;">Waiting for camera...</div>
+      </div>
+    </div>
+
+    <!-- Stats Panel -->
+    <div class="stats-panel">
+      <div class="stats-grid">
+        <div class="stat-card good">
+          <div class="label">Good</div>
+          <div class="value" id="good-count">0</div>
+        </div>
+        <div class="stat-card ng">
+          <div class="label">NG</div>
+          <div class="value" id="ng-count">0</div>
+        </div>
+        <div class="stat-card total">
+          <div class="label">Total</div>
+          <div class="value" id="total-count">0</div>
+        </div>
+        <div class="stat-card fps">
+          <div class="label">FPS</div>
+          <div class="value" id="fps-count">0</div>
+        </div>
+      </div>
+
+      <div class="rate-bar">
+        <div class="label-bar">
+          <span>Quality Rate</span>
+          <span id="rate-text">0%</span>
+        </div>
+        <div class="bar">
+          <div class="bar-fill good" id="rate-bar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="conveyor-status">
+        <span class="label">🔄 Conveyor Belt</span>
+        <span class="value" id="conveyor-status">---</span>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls" id="tab-dashboard">
+        <div class="control-row">
+          <button class="btn btn-primary" onclick="startSystem()">▶ Start</button>
+          <button class="btn btn-danger" onclick="stopSystem()">⏹ Stop</button>
+        </div>
+        <div class="slider-row">
+          <label>Patch Threshold</label>
+          <input type="range" id="patch-slider" min="0.05" max="0.5" step="0.001" value="0.0873" oninput="updateThreshold('patchcore', this.value)">
+          <span class="slider-value" id="patchcore-value">0.087</span>
+        </div>
+        <div class="slider-row">
+          <label>Confidence Threshold</label>
+          <input type="range" id="conf-slider" min="0.5" max="0.99" step="0.01" value="0.97" oninput="updateThreshold('conf', this.value)">
+          <span class="slider-value" id="conf-value">0.97</span>
+        </div>
+      </div>
+
+      <div class="controls" id="tab-settings" style="display:none;">
+        <div style="margin-top:12px;font-size:12px;color:#64748b;">
+          <p><strong>ESP IP:</strong> <span id="esp-ip">192.168.1.200</span></p>
+          <p><strong>Camera:</strong> 192.168.1.12</p>
+          <p><strong>Status:</strong> <span id="sys-status">Running</span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="history-section">
+      <div class="history-header">
+        <h2>📋 Detection History</h2>
+        <span style="font-size:12px;color:#64748b;" id="history-count">0 records</span>
+      </div>
+      <div id="history-body">
+        <div class="empty-state">No detections yet. Start the system to begin.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

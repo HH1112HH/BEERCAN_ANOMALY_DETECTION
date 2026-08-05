@@ -1,0 +1,3 @@
+{"id": 1, "timestamp": "18:52:53", "verdict": "NG", "yolo_confidence": 0.9703, "patchcore_score": 0.0881, "defects": ["patchcore"], "score": 0.0881, "details": {"patchcore": {"defect": true, "score": 0.0881}}}
+{"id": 2, "timestamp": "18:52:53", "verdict": "NG", "yolo_confidence": 0, "patchcore_score": null, "defects": ["no_detection"], "score": 1.0, "details": {"reason": "No product detected by YOLO after retry"}}
+{"id": 2, "timestamp": "18:52:54", "verdict": "NG", "yolo_confidence": 0.9719, "patchcore_score": 0.0888, "defects": ["patchcore"], "score": 0.0888, "details": {"patchcore": {"defect": true, "score": 0.0888}}}

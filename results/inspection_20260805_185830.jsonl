@@ -1,0 +1,2 @@
+{"id": 1, "timestamp": "18:58:32", "verdict": "NG", "yolo_confidence": 0, "patchcore_score": null, "defects": ["no_detection"], "score": 1.0, "details": {"reason": "No product detected by YOLO after retry"}}
+{"id": 1, "timestamp": "18:58:34", "verdict": "NG", "yolo_confidence": 0, "patchcore_score": null, "defects": ["no_detection"], "score": 1.0, "details": {"reason": "No product detected by YOLO after retry"}}

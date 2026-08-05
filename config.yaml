@@ -1,0 +1,28 @@
+camera:
+  rtsp_url: "rtsp://admin:L27B3642@192.168.1.103:554/cam/realmonitor?channel=1&subtype=0"
+  width: 1280
+  height: 720
+  fps: 30
+  inspect_delay: 1.0
+
+yolo:
+  model: "models/weights.pt"
+  confidence: 0.97
+  iou: 0.45
+  device: "cuda:0"
+  half: true
+  max_det: 1
+  imgsz: 960
+
+patchcore:
+  model: "models/patchcore_model.pkl"
+  threshold: 0.0873
+  device: "cuda:0"
+
+esp:
+  ip: "esp8266-conveyor.local"
+  conveyor_port: 12345
+
+server:
+  host: "0.0.0.0"
+  port: 5004

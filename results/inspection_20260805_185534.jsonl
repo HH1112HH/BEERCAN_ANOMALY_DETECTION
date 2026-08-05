@@ -1,0 +1,15 @@
+{"id": 1, "timestamp": "18:55:36", "verdict": "NG", "yolo_confidence": 0.988, "patchcore_score": 0.0996, "defects": ["patchcore"], "score": 0.0996, "details": {"patchcore": {"defect": true, "score": 0.0996}}}
+{"id": 2, "timestamp": "18:55:39", "verdict": "NG", "yolo_confidence": 0, "patchcore_score": null, "defects": ["no_detection"], "score": 1.0, "details": {"reason": "No product detected by YOLO after retry"}}
+{"id": 2, "timestamp": "18:55:39", "verdict": "NG", "yolo_confidence": 0.981, "patchcore_score": 0.1213, "defects": ["patchcore"], "score": 0.1213, "details": {"patchcore": {"defect": true, "score": 0.1213}}}
+{"id": 3, "timestamp": "18:55:51", "verdict": "GOOD", "yolo_confidence": 0.9814, "patchcore_score": 0.0791, "defects": [], "score": 0.0791, "details": {"patchcore": {"defect": false, "score": 0.0791}}}
+{"id": 4, "timestamp": "18:55:51", "verdict": "NG", "yolo_confidence": 0.9828, "patchcore_score": 0.0888, "defects": ["patchcore"], "score": 0.0888, "details": {"patchcore": {"defect": true, "score": 0.0888}}}
+{"id": 5, "timestamp": "18:55:58", "verdict": "NG", "yolo_confidence": 0.9806, "patchcore_score": 0.1309, "defects": ["patchcore"], "score": 0.1309, "details": {"patchcore": {"defect": true, "score": 0.1309}}}
+{"id": 6, "timestamp": "18:55:58", "verdict": "NG", "yolo_confidence": 0.9833, "patchcore_score": 0.1016, "defects": ["patchcore"], "score": 0.1016, "details": {"patchcore": {"defect": true, "score": 0.1016}}}
+{"id": 7, "timestamp": "18:56:06", "verdict": "NG", "yolo_confidence": 0.9802, "patchcore_score": 0.1041, "defects": ["patchcore"], "score": 0.1041, "details": {"patchcore": {"defect": true, "score": 0.1041}}}
+{"id": 8, "timestamp": "18:56:06", "verdict": "NG", "yolo_confidence": 0.9802, "patchcore_score": 0.1041, "defects": ["patchcore"], "score": 0.1041, "details": {"patchcore": {"defect": true, "score": 0.1041}}}
+{"id": 9, "timestamp": "18:56:12", "verdict": "GOOD", "yolo_confidence": 0.9711, "patchcore_score": 0.0819, "defects": [], "score": 0.0819, "details": {"patchcore": {"defect": false, "score": 0.0819}}}
+{"id": 10, "timestamp": "18:56:13", "verdict": "NG", "yolo_confidence": 0.984, "patchcore_score": 0.0961, "defects": ["patchcore"], "score": 0.0961, "details": {"patchcore": {"defect": true, "score": 0.0961}}}
+{"id": 11, "timestamp": "18:56:15", "verdict": "NG", "yolo_confidence": 0.984, "patchcore_score": 0.0918, "defects": ["patchcore"], "score": 0.0918, "details": {"patchcore": {"defect": true, "score": 0.0918}}}
+{"id": 12, "timestamp": "18:56:15", "verdict": "NG", "yolo_confidence": 0.9906, "patchcore_score": 0.1026, "defects": ["patchcore"], "score": 0.1026, "details": {"patchcore": {"defect": true, "score": 0.1026}}}
+{"id": 13, "timestamp": "18:56:18", "verdict": "NG", "yolo_confidence": 0, "patchcore_score": null, "defects": ["no_detection"], "score": 1.0, "details": {"reason": "No product detected by YOLO after retry"}}
+{"id": 13, "timestamp": "18:56:18", "verdict": "NG", "yolo_confidence": 0, "patchcore_score": null, "defects": ["no_detection"], "score": 1.0, "details": {"reason": "No product detected by YOLO after retry"}}
