@@ -33,6 +33,8 @@ Deploy thư mục `frontend/dist` lên static host. Backend cần cho phép orig
 uvicorn backend_asgi:app --host 0.0.0.0 --port 5004
 ```
 
+Hướng dẫn chi tiết chạy backend trực tiếp, Docker Compose và deploy frontend lên Netlify: [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ## Nhánh thuật toán
 
 - `algorithm/draem`: tích hợp adapter và checkpoint DRAEM sau khi huấn luyện.

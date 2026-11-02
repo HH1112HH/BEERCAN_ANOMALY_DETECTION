@@ -1,0 +1,14 @@
+services:
+  backend:
+    build: .
+    container_name: beercan-backend
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-5004}:5004"
+    environment:
+      FRONTEND_ORIGINS: "${FRONTEND_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./models:/app/models:ro
+      - ./results:/app/results
+      - ./captures:/app/captures
