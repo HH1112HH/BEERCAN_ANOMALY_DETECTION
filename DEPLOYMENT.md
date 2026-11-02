@@ -4,7 +4,7 @@ The React/Vite frontend and the Python API are separate deployables. The backend
 
 ## Before running the backend
 
-1. Copy `config.example.yaml` to `config.yaml` and enter the local camera/ESP settings. Do not commit the real `config.yaml` or secrets.
+1. If `config.yaml` does not already exist, copy `config.example.yaml` to it; otherwise edit the existing file. Enter local camera/ESP settings, and never commit secrets.
 2. Put trained model files in `models/` using the paths configured in `config.yaml`.
 3. Verify the machine running the backend can reach the RTSP camera and ESP over the required network.
 
@@ -37,12 +37,14 @@ Docker is CPU-only by default; GPU passthrough requires a separate NVIDIA/CUDA i
 1. Create the private config and provide weights:
 
    ```powershell
-   Copy-Item config.example.yaml config.yaml
+   if (!(Test-Path config.yaml)) { Copy-Item config.example.yaml config.yaml }
    New-Item -ItemType Directory -Force models
-   Copy-Item .env.example .env
+   if (!(Test-Path .env)) { Copy-Item .env.example .env }
    ```
 
    Then edit `config.yaml`, place the model files under `models/`, and set the correct local values in `.env`.
+
+   macOS/Linux equivalent: `cp -n config.example.yaml config.yaml` and `cp -n .env.example .env`.
 
 2. Build and start:
 
@@ -72,6 +74,8 @@ The checked-in `netlify.toml` configures the `frontend/` base directory, `npm ru
 Netlify cannot directly reach private addresses such as `192.168.x.x`. If the camera and ESP remain on a home/office LAN, keep the backend on that LAN and provide a secured VPN/reverse-proxy route for the frontend, or move the devices/backend to a network with a safe route. **Do not expose RTSP, ESP TCP control, or this unauthenticated API directly to the public Internet.** Add authentication and firewall/IP restrictions before public exposure; CORS is not authentication.
 
 Never put RTSP credentials, model weights, ESP credentials, or private IPs in `VITE_*` variables—the frontend bundle is public. Keep them on the backend.
+
+Security follow-up: the repository's original history may already contain an older tracked camera URL with credentials. Rotate that camera password; removing a file in a later commit does not erase it from Git history.
 
 ## Current limitation
 
