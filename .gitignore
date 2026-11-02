@@ -3,6 +3,7 @@ models/*.pth
 models/*.pt
 models/*.ckpt
 models/datasets/
+config.yaml
 captures/
 __pycache__/
 *.py[cod]
