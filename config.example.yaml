@@ -5,21 +5,29 @@ camera:
   width: 1280
   height: 720
   fps: 30
-  inspect_delay: 1.0
+  inspect_delay: 0.4
 
 yolo:
   model: "models/weights.pt"
-  confidence: 0.97
+  confidence: 0.45
   iou: 0.45
-  device: "cpu"
-  half: false
-  max_det: 1
+  device: "cuda:0"
+  half: true
+  max_det: 5
   imgsz: 960
+
+anomaly:
+  algorithm: "draem"
+
+draem:
+  model: "models/draem.pth"
+  threshold: 0.55
+  device: "cuda:0"
 
 patchcore:
   model: "models/patchcore_model.pkl"
   threshold: 0.0873
-  device: "cpu"
+  device: "cuda:0"
 
 esp:
   ip: "ESP_HOST_OR_IP"

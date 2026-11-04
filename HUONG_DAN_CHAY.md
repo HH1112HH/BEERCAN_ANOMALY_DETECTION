@@ -24,7 +24,7 @@ python3 main.py
 
 ## Bước 5: Mở trình duyệt
 
-Vào `http://localhost:5000` để xem dashboard.
+Vào `http://localhost:5004` để xem dashboard.
 
 ---
 

@@ -74,21 +74,23 @@
           <button class="btn btn-danger" onclick="stopSystem()">⏹ Stop</button>
         </div>
         <div class="slider-row">
-          <label>Patch Threshold</label>
-          <input type="range" id="patch-slider" min="0.05" max="0.5" step="0.001" value="0.0873" oninput="updateThreshold('patchcore', this.value)">
-          <span class="slider-value" id="patchcore-value">0.087</span>
+          <label>DRAEM Threshold (Ngưỡng lỗi)</label>
+          <input type="range" id="draem-slider" min="0.10" max="0.95" step="0.01" value="0.50" oninput="updateThreshold('draem', this.value)">
+          <span class="slider-value" id="draem-value">0.50</span>
         </div>
         <div class="slider-row">
-          <label>Confidence Threshold</label>
-          <input type="range" id="conf-slider" min="0.5" max="0.99" step="0.01" value="0.97" oninput="updateThreshold('conf', this.value)">
-          <span class="slider-value" id="conf-value">0.97</span>
+          <label>YOLO Confidence</label>
+          <input type="range" id="conf-slider" min="0.20" max="0.99" step="0.01" value="0.45" oninput="updateThreshold('conf', this.value)">
+          <span class="slider-value" id="conf-value">0.45</span>
         </div>
       </div>
 
       <div class="controls" id="tab-settings" style="display:none;">
         <div style="margin-top:12px;font-size:12px;color:#64748b;">
-          <p><strong>ESP IP:</strong> <span id="esp-ip">192.168.1.200</span></p>
-          <p><strong>Camera:</strong> 192.168.1.12</p>
+          <p><strong>Model:</strong> DRAEM (Recon + Discr UNet)</p>
+          <p><strong>Colab Suggested:</strong> 0.174</p>
+          <p><strong>ESP IP:</strong> <span id="esp-ip">192.168.1.37:12345</span></p>
+          <p><strong>Camera RTSP:</strong> 192.168.1.20:554</p>
           <p><strong>Status:</strong> <span id="sys-status">Running</span></p>
         </div>
       </div>

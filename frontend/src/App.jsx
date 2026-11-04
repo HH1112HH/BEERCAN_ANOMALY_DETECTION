@@ -19,7 +19,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { apiRequest, apiUrl } from "./api.js";
 
-const defaultThresholds = { patchcore: 0.0873, conf: 0.97 };
+const defaultThresholds = { draem: 0.40, patchcore: 0.0873, conf: 0.85 };
 const enterTransition = { type: "spring", stiffness: 150, damping: 22 };
 
 function Metric({ label, value, note, tone, icon: Icon, index = 0 }) {
@@ -335,13 +335,13 @@ export default function App() {
                 <SlidersHorizontal size={18} className="section-heading__icon" aria-hidden="true" />
               </div>
               <ThresholdControl
-                label="PatchCore anomaly threshold"
-                value={thresholds.patchcore}
-                min={0.05}
-                max={0.5}
-                step={0.001}
-                formatted={thresholds.patchcore.toFixed(4)}
-                onChange={(value) => changeThreshold("patchcore", value)}
+                label="DRAEM anomaly threshold"
+                value={thresholds.draem ?? 0.40}
+                min={0.10}
+                max={0.90}
+                step={0.01}
+                formatted={(thresholds.draem ?? 0.40).toFixed(2)}
+                onChange={(value) => changeThreshold("draem", value)}
               />
               <ThresholdControl
                 label="YOLO confidence"

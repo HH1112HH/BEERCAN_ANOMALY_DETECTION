@@ -28,6 +28,10 @@ class _Backbone(nn.Module):
 
 class PatchCore:
     def __init__(self, model_path: str, threshold: float = 0.87, device: str = "cuda:0"):
+        if device.startswith("cuda") and not torch.cuda.is_available():
+            logger.warning("CUDA not available, falling back to CPU")
+            device = "cpu"
+
         self.threshold = threshold
         self.device = device
         self.amp = device.startswith("cuda") and torch.cuda.is_available()

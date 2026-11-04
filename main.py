@@ -15,9 +15,15 @@ from datetime import datetime
 
 from camera_service import CameraService, CameraConfig
 from detector import YOLODetector
-from patch_core import PatchCore
 from classifier import Classifier
 from conveyor_controller import ConveyorController
+
+# Anomaly models
+from draem_model import DRAEM
+try:
+    from patch_core import PatchCore
+except Exception as e:
+    PatchCore = None
 
 
 class _NoConveyor:
@@ -54,11 +60,33 @@ detector = YOLODetector(
     max_det=cfg["yolo"].get("max_det", 1),
     imgsz=cfg["yolo"].get("imgsz", 960),
 )
-patch_core = PatchCore(
-    model_path=cfg["patchcore"]["model"],
-    threshold=cfg["patchcore"]["threshold"],
-    device=cfg["patchcore"].get("device", "cuda:0"),
-)
+
+anomaly_algo = cfg.get("anomaly", {}).get("algorithm", "draem")
+draem = None
+patch_core = None
+
+if "draem" in cfg:
+    try:
+        draem = DRAEM(
+            model_path=cfg["draem"]["model"],
+            threshold=cfg["draem"].get("threshold", 0.65),
+            device=cfg["draem"].get("device", "cuda:0"),
+        )
+        logger.info("DRAEM model initialized")
+    except Exception as e:
+        logger.error(f"Failed to load DRAEM model: {e}")
+
+if "patchcore" in cfg and PatchCore is not None:
+    try:
+        patch_core = PatchCore(
+            model_path=cfg["patchcore"]["model"],
+            threshold=cfg["patchcore"]["threshold"],
+            device=cfg["patchcore"].get("device", "cuda:0"),
+        )
+        logger.info("PatchCore model initialized")
+    except Exception as e:
+        logger.warning(f"Could not load PatchCore: {e}")
+
 classifier = Classifier()
 conveyor = ConveyorController(
     host=cfg["esp"]["ip"],
@@ -66,8 +94,7 @@ conveyor = ConveyorController(
 )
 conveyor.connect()
 if not conveyor.sock:
-    logger.warning("ESP not available, running without conveyor")
-    conveyor = _NoConveyor()
+    logger.warning("ESP not connected at startup, will keep reconnecting in background...")
 else:
     logger.info(f"ESP connected at {conveyor.host}:{conveyor.port}")
 
@@ -87,7 +114,7 @@ display_lock = threading.Lock()
 last_verdict = ""
 last_status_text = "Starting..."
 
-DETECT_CONF = 0.97
+DETECT_CONF = cfg["yolo"].get("confidence", 0.45)
 inspect_delay = cfg["camera"].get("inspect_delay", 1.0)
 
 
@@ -102,6 +129,187 @@ def update_display(frame, text, color=(255, 255, 255)):
     cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
     with display_lock:
         display_frame = frame
+
+
+def do_inspection(trigger_time: float, retry_detect: bool = True):
+    global display_frame, last_verdict, last_status_text, conveyor_running
+
+    logger.info(f"WAITING_INSPECTION received, waiting {inspect_delay:.2f}s for product to reach inspection point")
+    last_status_text = "Product arriving..."
+    wait_until = trigger_time + inspect_delay
+    while running:
+        remaining = wait_until - time.time()
+        if remaining <= 0:
+            break
+        conveyor.read_line(timeout=0.05)
+        if not conveyor.is_connected():
+            break
+        frame = camera.get_frame()
+        update_display(frame, "Product arriving...", (0, 200, 255))
+        time.sleep(0.02)
+    if not conveyor.is_connected():
+        return
+
+    last_status_text = "Inspecting..."
+
+    frame = camera.get_frame_near(wait_until)
+    if frame is None:
+        frame = camera.get_frame()
+    if frame is None:
+        logger.warning("No camera frame available -> sending NG")
+        conveyor.send("NG")
+        time.sleep(1.0)
+        conveyor.clear_buffer()
+        return
+    update_display(frame.copy(), "Inspecting...", (0, 200, 255))
+
+    dets = detector.detect(frame)
+
+    if not dets and retry_detect:
+        logger.info("No detection on first attempt, retrying once...")
+        time.sleep(0.3)
+        frame = camera.get_frame()
+        if frame is not None:
+            dets = detector.detect(frame)
+
+    if not dets:
+        logger.warning("No product detected after retry -> NG")
+        conveyor.send("NG")
+        last_verdict = "NG"
+        last_status_text = "No detection -> NG"
+        ins_result = classifier.classify(frame if frame is not None else np.zeros((100, 100, 3), dtype=np.uint8), {
+            "algo": "yolo", "defect": True, "score": 1.0, "reason": "No product detected"
+        })
+        result_data = {
+            "id": ins_result.product_id,
+            "timestamp": datetime.fromtimestamp(ins_result.timestamp).strftime("%H:%M:%S"),
+            "verdict": "NG",
+            "yolo_confidence": 0,
+            "anomaly_score": 1.0,
+            "draem_score": None,
+            "defects": ["no_detection"],
+            "score": 1.0,
+            "details": {"reason": "No product detected by YOLO after retry"},
+        }
+        history.append(result_data)
+        save_inspection_result(result_data)
+        if frame is not None:
+            cv2.putText(frame, "NO DETECT (NG)", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            with display_lock:
+                display_frame = frame
+        time.sleep(1.5)
+        conveyor.clear_buffer()
+        return
+
+    det = dets[0]
+    conf = det["confidence"]
+    roi = det.get("roi")
+    mask = det.get("mask")
+
+    if conf < DETECT_CONF or roi is None or roi.size == 0:
+        logger.warning(f"Low confidence or empty ROI (conf={conf:.3f}) -> NG")
+        conveyor.send("NG")
+        last_verdict = "NG"
+        last_status_text = f"Low conf: {conf:.2f} -> NG"
+        ins_result = classifier.classify(roi if (roi is not None and roi.size > 0) else np.zeros((100, 100, 3), dtype=np.uint8), {
+            "algo": "yolo", "defect": True, "score": 1.0, "reason": f"YOLO confidence {conf:.3f} < threshold {DETECT_CONF}"
+        })
+        result_data = {
+            "id": ins_result.product_id,
+            "timestamp": datetime.fromtimestamp(ins_result.timestamp).strftime("%H:%M:%S"),
+            "verdict": "NG",
+            "yolo_confidence": round(conf, 4),
+            "anomaly_score": 1.0,
+            "draem_score": None,
+            "defects": ["low_confidence"],
+            "score": 1.0,
+            "details": {"reason": f"YOLO confidence {conf:.3f} < threshold {DETECT_CONF}"},
+        }
+        history.append(result_data)
+        save_inspection_result(result_data)
+        if frame is not None:
+            cv2.putText(frame, f"LOW CONF (NG) {conf:.2f}", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            with display_lock:
+                display_frame = frame
+        time.sleep(1.5)
+        conveyor.clear_buffer()
+        return
+
+    # Anomaly inference
+    if anomaly_algo == "draem" and draem is not None:
+        model_res = draem.check(roi, mask=mask, need_heatmap=True)
+        model_tag = "DRAEM"
+    elif patch_core is not None:
+        model_res = patch_core.check(roi, need_heatmap=True)
+        model_res["algo"] = "patchcore"
+        model_tag = "PatchCore"
+    else:
+        model_res = {"algo": "none", "defect": False, "score": 0.0, "reason": "No model loaded"}
+        model_tag = "NONE"
+
+    ins_result = classifier.classify(roi, model_res)
+    verdict = ins_result.details["verdict"]
+
+    last_verdict = verdict
+    last_status_text = f"{verdict}"
+
+    conveyor.send("OK" if verdict == "GOOD" else "NG")
+    conveyor_running = (verdict == "GOOD")
+
+    x1, y1, x2, y2 = det["bbox"]
+    color = (0, 255, 0) if verdict == "GOOD" else (0, 0, 255)
+    label = f"{model_tag}:{model_res['score']:.2f} {verdict}"
+
+    result_display = frame
+    cv2.rectangle(result_display, (x1, y1), (x2, y2), color, 3)
+    cv2.putText(result_display, label, (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+    heatmap = model_res.get("heatmap")
+    if verdict == "NG" and heatmap is not None:
+        hm = cv2.resize(heatmap, (x2 - x1, y2 - y1))
+        result_display[y1:y2, x1:x2] = hm
+
+    with display_lock:
+        display_frame = result_display
+
+    if verdict == "NG":
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        cv2.imwrite(str(capture_dir / f"{ts}_result.jpg"), result_display)
+        if heatmap is not None:
+            cv2.imwrite(str(capture_dir / f"{ts}_heatmap.jpg"), heatmap)
+        cv2.imwrite(str(capture_dir / f"{ts}_roi.jpg"), roi)
+        logger.info(f"Saved NG capture: {ts}")
+
+    result_data = {
+        "id": ins_result.product_id,
+        "timestamp": datetime.fromtimestamp(ins_result.timestamp).strftime("%H:%M:%S"),
+        "verdict": verdict,
+        "yolo_confidence": round(conf, 4),
+        "anomaly_score": model_res["score"],
+        "draem_score": model_res["score"] if anomaly_algo == "draem" else None,
+        "defects": ins_result.details["defects_found"],
+        "score": ins_result.score,
+        "details": ins_result.details["algorithm_results"],
+    }
+    history.append(result_data)
+
+    save_inspection_result(result_data)
+
+    # Cooldown: cho lon vua kiem tra di qua khoi camera va vung thanh chan hoan toan
+    cooldown_s = 2.0
+    cooldown_until = time.time() + cooldown_s
+    while running and time.time() < cooldown_until:
+        f = camera.get_frame()
+        tag = "GOOD -> PASSING" if verdict == "GOOD" else "NG -> EJECTING"
+        update_display(f, f"{tag}", (0, 255, 0) if verdict == "GOOD" else (0, 0, 255))
+        time.sleep(0.05)
+
+    # Xoa sach toan bo tin nhan ton dong trong socket TCP
+    # (triet tieu 100% loi kich hoat trung lap 2 lan cho cung 1 chiec lon)
+    conveyor.clear_buffer()
 
 
 def inspection_worker():
@@ -130,9 +338,13 @@ def inspection_worker():
         trigger_time = None
         while running:
             msg = conveyor.read_line(timeout=0.02)
-            if msg and ("TRIGGER_CAMERA" in msg or "WAITING_INSPECTION" in msg):
-                trigger_time = time.time()
-                break
+            if msg:
+                if "TRIGGER_CAMERA" in msg or "WAITING_INSPECTION" in msg:
+                    logger.info("ESP Trigger received: %s", msg)
+                    trigger_time = time.time()
+                    break
+                elif "[DIAG]" in msg or "STATE=" in msg or "SLOW_" in msg:
+                    logger.info("ESP: %s", msg)
             if not conveyor.is_connected():
                 break
             frame = camera.get_frame()
@@ -141,137 +353,34 @@ def inspection_worker():
         if trigger_time is None:
             continue
 
-        logger.info(f"WAITING_INSPECTION received, waiting {inspect_delay:.2f}s for product to reach inspection point")
-        last_status_text = "Product arriving..."
-        wait_until = trigger_time + inspect_delay
-        while running:
-            remaining = wait_until - time.time()
-            if remaining <= 0:
-                break
-            conveyor.read_line(timeout=0.05)
-            if not conveyor.is_connected():
-                break
-            frame = camera.get_frame()
-            update_display(frame, "Product arriving...", (0, 200, 255))
-            time.sleep(0.02)
-        if not conveyor.is_connected():
-            continue
-
-        last_status_text = "Inspecting..."
-
-        frame = camera.get_frame_near(wait_until)
-        if frame is None:
-            frame = camera.get_frame()
-        if frame is None:
-            continue
-        update_display(frame.copy(), "Inspecting...", (0, 200, 255))
-
-        dets = detector.detect(frame)
-
-        if not dets and retry_detect:
-            logger.info("No detection on first attempt, retrying once...")
-            time.sleep(0.3)
-            frame = camera.get_frame()
-            if frame is not None:
-                dets = detector.detect(frame)
-
-        if not dets:
-            logger.warning("No product detected after retry -> NG")
-            conveyor.send("NG")
+        try:
+            do_inspection(trigger_time, retry_detect)
+        except Exception as e:
+            logger.exception("Error in inspection cycle: %s", e)
             last_verdict = "NG"
-            last_status_text = "No detection -> NG"
-            save_inspection_result({
-                "id": classifier.product_count + 1,
-                "timestamp": datetime.now().strftime("%H:%M:%S"),
+            last_status_text = f"Error: {e}"
+            ins_result = classifier.classify(np.zeros((100, 100, 3), dtype=np.uint8), {
+                "algo": "system", "defect": True, "score": 1.0, "reason": f"Inspection error: {e}"
+            })
+            result_data = {
+                "id": ins_result.product_id,
+                "timestamp": datetime.fromtimestamp(ins_result.timestamp).strftime("%H:%M:%S"),
                 "verdict": "NG",
                 "yolo_confidence": 0,
-                "patchcore_score": None,
-                "defects": ["no_detection"],
+                "anomaly_score": 1.0,
+                "draem_score": None,
+                "defects": ["system_error"],
                 "score": 1.0,
-                "details": {"reason": "No product detected by YOLO after retry"},
-            })
-            if frame is not None:
-                cv2.putText(frame, "NO DETECT (NG)", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                with display_lock:
-                    display_frame = frame
-            continue
-
-        det = dets[0]
-        conf = det["confidence"]
-        roi = det.get("roi")
-
-        if conf < DETECT_CONF or roi is None or roi.size == 0:
-            logger.warning(f"Low confidence or empty ROI (conf={conf:.3f}) -> NG")
-            conveyor.send("NG")
-            last_verdict = "NG"
-            last_status_text = f"Low conf: {conf:.2f} -> NG"
-            save_inspection_result({
-                "id": classifier.product_count + 1,
-                "timestamp": datetime.now().strftime("%H:%M:%S"),
-                "verdict": "NG",
-                "yolo_confidence": round(conf, 4),
-                "patchcore_score": None,
-                "defects": ["low_confidence"],
-                "score": 1.0,
-                "details": {"reason": f"YOLO confidence {conf:.3f} < threshold {DETECT_CONF}"},
-            })
-            if frame is not None:
-                cv2.putText(frame, f"LOW CONF (NG) {conf:.2f}", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                with display_lock:
-                    display_frame = frame
-            continue
-
-        pc_result = patch_core.check(roi, need_heatmap=True)
-        ins_result = classifier.classify(roi, pc_result)
-        verdict = ins_result.details["verdict"]
-
-        last_verdict = verdict
-        last_status_text = f"{verdict}"
-
-        conveyor.send("OK" if verdict == "GOOD" else "NG")
-        conveyor_running = (verdict == "GOOD")
-
-        x1, y1, x2, y2 = det["bbox"]
-        color = (0, 255, 0) if verdict == "GOOD" else (0, 0, 255)
-        label = f"PC:{pc_result['score']:.2f} {verdict}"
-
-        result_display = frame
-        cv2.rectangle(result_display, (x1, y1), (x2, y2), color, 3)
-        cv2.putText(result_display, label, (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-
-        heatmap = pc_result.get("heatmap")
-        if verdict == "NG" and heatmap is not None:
-            hm = cv2.resize(heatmap, (x2 - x1, y2 - y1))
-            result_display[y1:y2, x1:x2] = cv2.addWeighted(
-                result_display[y1:y2, x1:x2], 0.6, hm, 0.4, 0)
-
-        with display_lock:
-            display_frame = result_display
-
-        if verdict == "NG":
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-            cv2.imwrite(str(capture_dir / f"{ts}_result.jpg"), result_display)
-            if heatmap is not None:
-                cv2.imwrite(str(capture_dir / f"{ts}_heatmap.jpg"), heatmap)
-            cv2.imwrite(str(capture_dir / f"{ts}_roi.jpg"), roi)
-            logger.info(f"Saved NG capture: {ts}")
-
-        result_data = {
-            "id": ins_result.product_id,
-            "timestamp": datetime.fromtimestamp(ins_result.timestamp).strftime("%H:%M:%S"),
-            "verdict": verdict,
-            "yolo_confidence": round(conf, 4),
-            "patchcore_score": pc_result["score"],
-            "defects": ins_result.details["defects_found"],
-            "score": ins_result.score,
-            "details": ins_result.details["algorithm_results"],
-        }
-        history.append(result_data)
-
-        save_inspection_result(result_data)
+                "details": {"reason": f"System error: {e}"},
+            }
+            history.append(result_data)
+            save_inspection_result(result_data)
+            try:
+                conveyor.send("NG")
+            except Exception:
+                pass
+            time.sleep(1.0)
+            conveyor.clear_buffer()
 
 
 inspection_thread = threading.Thread(target=inspection_worker, daemon=True)
@@ -335,6 +444,10 @@ async def get_status():
         "processing": processing_enabled,
         "status_text": last_status_text,
         "last_verdict": last_verdict,
+        "algo": anomaly_algo,
+        "draem_threshold": draem.threshold if draem else 0.40,
+        "patchcore_threshold": patch_core.threshold if patch_core else 0.087,
+        "conf_threshold": detector.conf,
     }
 
 
@@ -391,12 +504,27 @@ async def conveyor_status():
 
 @app.post("/control/threshold")
 async def set_threshold(data: dict):
+    global anomaly_algo, DETECT_CONF
     algo = data.get("algo", "")
-    value = data.get("value", 0.5)
-    if algo == "patchcore":
+    value = float(data.get("value", 0.4))
+    if algo == "draem" and draem is not None:
+        draem.threshold = value
+        cfg["draem"]["threshold"] = value
+        logger.info(f"Updated DRAEM threshold to {value:.4f}")
+    elif algo == "patchcore" and patch_core is not None:
         patch_core.threshold = value
+        cfg["patchcore"]["threshold"] = value
+        logger.info(f"Updated PatchCore threshold to {value:.4f}")
     elif algo == "conf":
         detector.conf = value
+        DETECT_CONF = value
+        cfg["yolo"]["confidence"] = value
+        logger.info(f"Updated YOLO confidence threshold to {value:.4f}")
+    try:
+        with open("config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(cfg, f, default_flow_style=False)
+    except Exception as e:
+        logger.warning(f"Could not save config.yaml: {e}")
     return {"algo": algo, "value": value}
 
 

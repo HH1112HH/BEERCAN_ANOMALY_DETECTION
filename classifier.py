@@ -19,32 +19,33 @@ class Classifier:
         self.good_count = 0
         self.ng_count = 0
 
-    def classify(self, roi, patchcore_result: dict):
+    def classify(self, roi, model_result: dict):
         self.product_count += 1
 
-        pc_defect = patchcore_result.get("defect", False)
-        pc_score = patchcore_result.get("score", 0)
-        defects = ["patchcore"] if pc_defect else []
+        algo = model_result.get("algo", "draem")
+        defect = model_result.get("defect", False)
+        score = model_result.get("score", 0)
+        defects = [algo] if defect else []
 
-        if pc_defect:
+        if defect:
             self.ng_count += 1
             verdict = "NG"
         else:
             self.good_count += 1
             verdict = "GOOD"
 
-        logger.info(f"Product #{self.product_count}: {verdict} (score={pc_score:.3f})")
+        logger.info(f"Product #{self.product_count}: {verdict} ({algo} score={score:.3f})")
 
         return InspectionResult(
             product_id=self.product_count,
             timestamp=time.time(),
-            has_defect=pc_defect,
-            score=round(pc_score, 4),
+            has_defect=defect,
+            score=round(score, 4),
             details={
                 "verdict": verdict,
                 "defects_found": defects,
                 "algorithm_results": {
-                    "patchcore": {"defect": pc_defect, "score": pc_score},
+                    algo: {"defect": defect, "score": score},
                 },
                 "good_count": self.good_count,
                 "ng_count": self.ng_count,

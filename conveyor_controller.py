@@ -1,6 +1,6 @@
 import socket
 
-ESP_HOST = "esp8266-conveyor.local"
+ESP_HOST = "192.168.1.42"
 ESP_PORT = 12345
 
 
@@ -14,13 +14,18 @@ class ConveyorController:
     def connect(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(1.5)
+            self.sock.settimeout(1.0)
             self.sock.connect((self.host, self.port))
             self.sock.settimeout(0.5)
             print(f"[OK] Connected to {self.host}:{self.port}")
             return True
         except Exception as e:
-            print(f"[ERROR] Cannot connect: {e}")
+            print(f"[ERROR] Cannot connect to {self.host}:{self.port}: {e}")
+            if self.sock:
+                try:
+                    self.sock.close()
+                except:
+                    pass
             self.sock = None
             return False
 
@@ -55,6 +60,24 @@ class ConveyorController:
             return line.strip()
         return None
 
+    def clear_buffer(self):
+        self.buffer = ""
+        if not self.sock:
+            return
+        try:
+            self.sock.settimeout(0.01)
+            while True:
+                data = self.sock.recv(4096)
+                if not data:
+                    break
+        except:
+            pass
+        finally:
+            try:
+                self.sock.settimeout(0.5)
+            except:
+                pass
+
     def is_connected(self):
         return self.sock is not None
 
@@ -71,8 +94,8 @@ class ConveyorController:
                 return True
             if timeout is not None:
                 timeout -= 0.5
-                if timeout <= 0:
-                    return False
+            if timeout <= 0:
+                return False
 
     def send_ok(self):
         return self.send("OK")
@@ -82,7 +105,10 @@ class ConveyorController:
 
     def disconnect(self):
         if self.sock:
-            self.sock.close()
+            try:
+                self.sock.close()
+            except:
+                pass
             self.sock = None
 
     def run_ai_loop(self):

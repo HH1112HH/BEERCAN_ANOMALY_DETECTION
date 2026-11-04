@@ -1,5 +1,6 @@
 let historyData = [];
 let polling = true;
+let sliderInitialized = false;
 
 function showToast(message, type) {
   const toast = document.getElementById('toast');
@@ -37,6 +38,22 @@ async function fetchStatus() {
     const conveyor = document.getElementById('conveyor-status');
     conveyor.textContent = data.conveyor === 'running' ? '🟢 RUNNING' : '🔴 STOPPED';
     conveyor.className = 'value ' + data.conveyor;
+
+    if (!sliderInitialized && data.draem_threshold !== undefined) {
+      const draemSlider = document.getElementById('draem-slider');
+      const draemVal = document.getElementById('draem-value');
+      if (draemSlider && draemVal) {
+        draemSlider.value = data.draem_threshold;
+        draemVal.textContent = parseFloat(data.draem_threshold).toFixed(2);
+      }
+      const confSlider = document.getElementById('conf-slider');
+      const confVal = document.getElementById('conf-value');
+      if (confSlider && confVal && data.conf_threshold !== undefined) {
+        confSlider.value = data.conf_threshold;
+        confVal.textContent = parseFloat(data.conf_threshold).toFixed(2);
+      }
+      sliderInitialized = true;
+    }
   } catch (e) {
     console.error('Status fetch error:', e);
   }
@@ -101,7 +118,10 @@ async function resetCounters() {
 }
 
 async function updateThreshold(algo, value) {
-  document.getElementById(algo + '-value').textContent = parseFloat(value).toFixed(2);
+  const valEl = document.getElementById(algo + '-value');
+  if (valEl) {
+    valEl.textContent = parseFloat(value).toFixed(2);
+  }
   await fetch('/control/threshold', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
