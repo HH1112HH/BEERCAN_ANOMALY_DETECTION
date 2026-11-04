@@ -53,14 +53,14 @@ volatile bool isRunning = false;
 #define SERVO_FEED          180    // vi tri gat lon vao vi tri chup / chan lon
 #define SERVO_EJECT         180    // goc da nhanh toi da cua MG90S khi NG
 
-#define SLOW_FEED_TIME_MS   3000   // tong thoi gian quay 180 do cham (ms)
-#define SLOW_RETURN_TIME_MS 3000   // hoi servo cham khi ket qua OK (neu dung sweep)
+#define SLOW_FEED_TIME_MS   600    // tong thoi gian quay 180 do cham (ms)
+#define SLOW_RETURN_TIME_MS 400    // hoi servo cham khi ket qua OK (neu dung sweep)
 #define SLOW_FEED_REFRESH   20     // cap nhat goc moi 20ms
-#define NG_HOME_SETTLE_MS   300    // cho servo dung yen tai 0 truoc khi chay bang chuyen
+#define NG_HOME_SETTLE_MS   150    // cho servo dung yen tai 0 truoc khi chay bang chuyen
 #define NG_PASS_TIMEOUT_MS  15000  // neu lon khong roi IR thi dung bang chuyen
 #define OK_PASS_TIMEOUT_MS  10000  // failsafe neu lon tot bi ket tren duong di
-#define STRIKE_HOLD_MS      500    // cho servo toi goc day lon truoc khi hoi ve
-#define STRIKE_RETURN_MS    1500   // thoi gian cho truoc khi bang chuyen chay lai
+#define STRIKE_HOLD_MS      350    // cho servo toi goc day lon truoc khi hoi ve
+#define STRIKE_RETURN_MS    550    // thoi gian cho truoc khi bang chuyen chay lai
 #define INSPECTION_FAILSAFE_MS 30000 // fallback neu PC mat ket noi
 
 Servo servo;
