@@ -12,22 +12,33 @@ class ConveyorController:
         self.buffer = ""
 
     def connect(self):
-        try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(1.0)
-            self.sock.connect((self.host, self.port))
-            self.sock.settimeout(0.5)
-            print(f"[OK] Connected to {self.host}:{self.port}")
-            return True
-        except Exception as e:
-            print(f"[ERROR] Cannot connect to {self.host}:{self.port}: {e}")
-            if self.sock:
-                try:
-                    self.sock.close()
-                except:
-                    pass
-            self.sock = None
-            return False
+        hosts_to_try = [self.host]
+        if self.host != "esp8266-conveyor.local":
+            hosts_to_try.append("esp8266-conveyor.local")
+
+        last_err = None
+        for target_host in hosts_to_try:
+            try:
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.settimeout(1.0)
+                self.sock.connect((target_host, self.port))
+                self.sock.settimeout(0.5)
+                if target_host != self.host:
+                    print(f"[AUTO-DISCOVERY] ESP IP changed/discovered: {target_host}")
+                    self.host = target_host
+                print(f"[OK] Connected to {self.host}:{self.port}")
+                return True
+            except Exception as e:
+                last_err = e
+                if self.sock:
+                    try:
+                        self.sock.close()
+                    except:
+                        pass
+                self.sock = None
+
+        print(f"[ERROR] Cannot connect to {self.host}:{self.port}: {last_err}")
+        return False
 
     def send(self, cmd):
         if not self.sock:

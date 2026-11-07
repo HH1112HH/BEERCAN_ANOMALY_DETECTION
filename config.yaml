@@ -3,16 +3,16 @@ anomaly:
 camera:
   fps: 30
   height: 720
-  inspect_delay: 0.25
+  inspect_delay: 0.18
   rtsp_url: rtsp://admin:L27B3642@192.168.1.20:554/cam/realmonitor?channel=1&subtype=0
   width: 1280
 draem:
   device: cuda:0
   model: models/draem.pth
-  threshold: 0.55
+  threshold: 0.25
 esp:
   conveyor_port: 12345
-  ip: 192.168.1.49
+  ip: 192.168.1.54
 patchcore:
   device: cuda:0
   model: models/patchcore_model.pkl

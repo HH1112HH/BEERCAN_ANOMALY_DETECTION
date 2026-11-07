@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 
 # Ensure UTF-8 output on Windows consoles
 if sys.platform == "win32":
@@ -28,45 +29,80 @@ logger = logging.getLogger("cap")
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    if Path(config_path).exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+
+def resolve_target_dir(arg: str) -> Path:
+    arg_lower = (arg or "").lower().strip()
+    if arg_lower in ["", "ok", "train", "train_ok"]:
+        return Path("dataset/train_ok")
+    elif arg_lower in ["ng", "test_ng", "error", "defect", "loi"]:
+        return Path("dataset/test_ng")
+    elif arg_lower in ["test_ok", "test"]:
+        return Path("dataset/test_ok")
+    else:
+        return Path(arg)
 
 
 def get_next_can_index(save_dir: Path) -> int:
-    existing = list(save_dir.glob("can_*.jpg"))
-    if not existing:
+    if not save_dir.exists():
         return 1
     indices = []
-    for p in existing:
-        stem = p.stem  # e.g. "can_12"
-        parts = stem.split("_")
-        if len(parts) >= 2 and parts[-1].isdigit():
-            indices.append(int(parts[-1]))
-    return max(indices) + 1 if indices else len(existing) + 1
+    # Quét tất cả các định dạng ảnh phổ biến
+    for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.JPG", "*.PNG"]:
+        for p in save_dir.glob(ext):
+            matches = re.findall(r"\d+", p.stem)
+            if matches:
+                try:
+                    indices.append(int(matches[-1]))
+                except ValueError:
+                    pass
+    return (max(indices) + 1) if indices else 1
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Auto RAW Can Collector for DRAEM Training")
-    parser.add_argument("--dir", type=str, default="dataset/train_ok", help="Thu muc luu anh raw (default: dataset/train_ok)")
-    parser.add_argument("--no-esp", action="store_true", help="Chay che do chup thu cong khong ket noi ESP8266")
+    parser = argparse.ArgumentParser(description="Hệ thống chụp ảnh RAW thu thập Dataset cho DRAEM")
+    parser.add_argument(
+        "mode",
+        nargs="?",
+        default="",
+        help="Chế độ chụp / thư mục lưu: 'ok'/'train' (dataset/train_ok) hoặc 'ng'/'test_ng' (dataset/test_ng)"
+    )
+    parser.add_argument("--dir", type=str, default=None, help="Thư mục lưu ảnh tùy chọn (nếu có)")
+    parser.add_argument("--no-esp", action="store_true", help="Chạy chế độ chụp thủ công không kết nối ESP8266")
     args = parser.parse_args()
 
     cfg = load_config("config.yaml")
 
-    save_dir = Path(args.dir)
+    # Xác định thư mục lưu ảnh
+    if args.dir:
+        save_dir = Path(args.dir)
+    else:
+        save_dir = resolve_target_dir(args.mode)
+
     save_dir.mkdir(parents=True, exist_ok=True)
 
     can_idx = get_next_can_index(save_dir)
-    print("\n" + "=" * 62)
-    print(" 📸 HỆ THỐNG CHỤP ẢNH RAW LON TRÊN BĂNG CHUYỀN (KHÔNG CẮT)")
-    print("=" * 62)
+    mode_desc = "LON TỐT (TRAIN_OK)" if "train_ok" in str(save_dir) else ("LON LỖI (TEST_NG)" if "test_ng" in str(save_dir) else str(save_dir))
+
+    print("\n" + "=" * 64)
+    print(" 📸 HỆ THỐNG CHỤP ẢNH RAW LON TRÊN BĂNG CHUYỀN (AUTO INDEX)")
+    print("=" * 64)
+    print(f" [🎯] Mục tiêu thu thập    : {mode_desc}")
     print(f" [📁] Thư mục lưu ảnh RAW : {save_dir.resolve()}")
-    print(f" [🔢] Tên file bắt đầu     : can_{can_idx}.jpg")
-    print(" [⌨️] Phím tắt:")
-    print("      - SPACE / Phím C : Chụp ngay lập tức 1 ảnh RAW")
-    print("      - Q / ESC        : Thoát chương trình")
-    print(" [🔄] Tự động: Lon tới cảm biến -> Chụp RAW -> Cho lon đi tiếp")
-    print("=" * 62 + "\n")
+    print(f" [🔢] Tên file tiếp theo   : can_{can_idx}.jpg")
+    print(" [💡] Cách dùng lệnh:")
+    print("      - cap           -> Chụp lon tốt (dataset/train_ok) tiếp tục từ file cao nhất")
+    print("      - cap ng        -> Chụp lon lỗi (dataset/test_ng) tiếp tục từ file cao nhất")
+    print("      - cap test_ok   -> Chụp lon test (dataset/test_ok)")
+    print(" [⌨️] Phím tắt trong cửa sổ:")
+    print("      - SPACE / Phím C : Chụp ngay 1 ảnh thủ công")
+    print("      - Q / ESC        : Dừng chương trình")
+    print(" [🔄] Tự động: Cảm biến IR nhận lon -> Dừng ổn định -> Chụp -> Cho lon đi")
+    print("=" * 64 + "\n")
 
     # 1. Khởi tạo Camera RTSP
     cam_cfg = cfg.get("camera", {})
@@ -83,22 +119,24 @@ def main():
     conveyor = None
     if not args.no_esp:
         esp_cfg = cfg.get("esp", {})
+        esp_ip = esp_cfg.get("ip", "192.168.1.49")
+        esp_port = esp_cfg.get("conveyor_port", 12345)
+        logger.info(f"Đang kết nối ESP8266: {esp_ip}:{esp_port}...")
         conveyor = ConveyorController(
-            host=esp_cfg.get("ip", "192.168.1.37"),
-            port=esp_cfg.get("conveyor_port", 12345),
+            host=esp_ip,
+            port=esp_port,
         )
         conveyor.connect()
         if conveyor.is_connected():
-            logger.info("ESP8266 đã kết nối thành công! Đang đồng bộ và dọn sạch bộ đệm...")
-            time.sleep(0.5)
+            logger.info("✅ ESP8266 đã kết nối thành công! Đang dọn sạch bộ đệm...")
+            time.sleep(0.3)
             conveyor.clear_buffer()
-            # Gửi lệnh START/OK để đảm bảo băng chuyền ở trạng thái RUNNING sẵn sàng đón lon
             conveyor.send("START")
-            time.sleep(0.5)
+            time.sleep(0.3)
             conveyor.clear_buffer()
-            logger.info("ESP8266 sẵn sàng! Đang chờ lon đến cảm biến...")
+            logger.info("🚀 Băng chuyền sẵn sàng! Hãy thả lon vào...")
         else:
-            logger.warning("Chưa thấy ESP8266, bạn vẫn có thể bấm phím SPACE để chụp thủ công.")
+            logger.warning("⚠️ Chưa kết nối được ESP8266. Bạn vẫn có thể bấm phím SPACE để chụp thủ công.")
 
     flash_text = ""
     flash_timer = 0
@@ -115,12 +153,12 @@ def main():
 
         captured_count += 1
         h, w = frame_raw.shape[:2]
-        flash_text = f"DA CHUP: can_{can_idx}.jpg (Tong: {captured_count})"
+        flash_text = f"DA CHUP: can_{can_idx}.jpg (Session: {captured_count})"
         flash_timer = time.time() + 1.2
         logger.info(f"✅ ĐÃ LƯU ẢNH RAW [{captured_count}] -> {save_path.name} ({w}x{h})")
         can_idx += 1
 
-    window_name = "RAW Can Capture [SPACE: Snap | Q: Quit]"
+    window_name = f"RAW Capture - {save_dir.name} [SPACE: Snap | Q: Quit]"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, 960, 540)
 
@@ -129,23 +167,22 @@ def main():
             # Kiểm tra tín hiệu từ cảm biến IR qua ESP8266
             if conveyor and conveyor.is_connected():
                 msg = conveyor.read_line(timeout=0.01)
-                # Chỉ kích hoạt khi ESP báo lon đã vào vị trí dừng (TRIGGER_CAMERA)
-                if msg and "TRIGGER_CAMERA" in msg:
-                    logger.info("📡 Tín hiệu từ ESP8266: Lon đã tới vị trí! Đang chờ 500ms cho lon dừng hẳn...")
-                    flash_text = "DANG CHO LON DUNG HAN..."
+                # Kích hoạt khi ESP báo lon đã vào vị trí dừng (TRIGGER_CAMERA)
+                if msg and ("TRIGGER_CAMERA" in msg or "WAITING_INSPECTION" in msg):
+                    logger.info("📡 Tín hiệu từ cảm biến: Lon đã tới vị trí! Đang chờ 500ms cho lon ổn định tuyệt đối...")
+                    flash_text = "DANG ON DINH LON..."
                     flash_timer = time.time() + 0.6
                     
-                    # Chờ 500ms cho lon dừng hẳn hoàn toàn và RTSP cập nhật frame tĩnh
-                    time.sleep(0.5)
+                    # Chờ 500ms cho lon dừng hẳn hoàn toàn (như đợt 1-190)
+                    time.sleep(0.50)
                     snap_frame = camera.get_frame()
                     if snap_frame is not None:
                         capture_can(snap_frame)
                     
                     # Gửi lệnh OK để băng chuyền tiếp tục chạy lon qua cổng
                     conveyor.send("OK")
-                    logger.info("➡️ Đã gửi lệnh OK cho lon đi qua cổng.")
-                    # Chờ 2.0s cho lon đi qua hẳn khỏi cảm biến và xóa sạch buffer
-                    time.sleep(2.0)
+                    logger.info("➡️ Đã gửi lệnh OK cho lon đi tiếp.")
+                    time.sleep(1.0)
                     conveyor.clear_buffer()
 
             frame = camera.get_frame()
@@ -155,9 +192,9 @@ def main():
 
             display = frame.copy()
 
-            # Hiển thị HUD thông tin
+            # Hiển thị HUD thông tin trên màn hình
             cv2.rectangle(display, (0, 0), (display.shape[1], 45), (20, 20, 20), -1)
-            hud = f"Thu muc: {save_dir.name} | Da chup RAW: {captured_count} lon | Next: can_{can_idx}.jpg"
+            hud = f"Muc: {save_dir.name} | Da chup dot nay: {captured_count} | Tiep theo: can_{can_idx}.jpg"
             cv2.putText(display, hud, (15, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
             if flash_timer > time.time():
@@ -173,7 +210,7 @@ def main():
                 capture_can(frame)
                 if conveyor and conveyor.is_connected():
                     conveyor.send("OK")
-                    time.sleep(1.5)
+                    time.sleep(1.0)
                     conveyor.clear_buffer()
 
     except KeyboardInterrupt:
@@ -183,8 +220,9 @@ def main():
         if conveyor:
             conveyor.disconnect()
         print("\n" + "=" * 60)
-        print(f" [✓] HOÀN TẤT! Đã chụp tổng cộng: {captured_count} ảnh RAW.")
+        print(f" [✓] HOÀN TẤT! Đã chụp thêm: {captured_count} ảnh RAW.")
         print(f" [📁] Vị trí ảnh: {save_dir.resolve()}")
+        print(f" [🔢] File cuối cùng hiện tại: can_{can_idx - 1}.jpg")
         print("=" * 60 + "\n")
 
 

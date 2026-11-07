@@ -13,7 +13,6 @@
 #define SERVO_PIN  5
 
 // Driver PUL- active-LOW: tao xung bang LOW ngan, sau do tha chan ve INPUT.
-// Day la cach pulse cua sketch ban dau da chay tot; khong doi sang relay/HIGH.
 #define OBSTACLE_STATE LOW
 #define STEP_DELAY_US   1500
 
@@ -31,37 +30,49 @@ volatile bool isRunning = false;
 
 // ============================================================================
 // Y NGHIA QUY TRINH:
-// 1. RUNNING  : phat xung PUL tren GPIO12, cho lon moi toi che IR (lastIR!=LOW && ir==LOW).
+// 1. RUNNING  : phat xung PUL tren GPIO12, cho lon moi toi che IR.
 // 2. Lon cham IR:
-//      -> FEEDING : quay thanh chan 0 -> 180 do de gat lon vao vi tri chup.
+//      -> FEEDING : quay thanh chan 2 giai doan (nhanh 140 do dau, cham 40 do cuoi)
+//                   de nhe nhang om lon dung tam, khong lam hat lui lon.
 //      -> WAITING : dung bang chuyen (motorOff) va gui "TRIGGER_CAMERA".
 // 3. PC (main.py + DRAEM) tra ket qua:
 //      "OK" (Lon tot) :
-//             -> OK_PASSING: Mo servo ve 0 (SERVO_HOME), bat bang chuyen (motorOn)
-//                            cho lon tot di qua. Bo qua cam bien trong luc lon
-//                            dang luot qua IR; khi IR clear lien tuc 600ms
-//                            (lon da thoat han) moi quay ve RUNNING!
+//             -> RETURNING : Mo can gat nhanh ve 0 (SERVO_HOME), cho can rut han 250ms (motorOff).
+//             -> OK_PASSING: Bat bang chuyen (motorOn) cho lon tot di qua.
 //      "NG" (Lon loi) :
-//             -> NG_HOME: Mo thanh chan ve 0 truoc de lon di toi vi tri gat.
-//             -> NG_PASSING: Chay bang chuyen cho lon toi vi tri gat (IR clear 500ms).
-//             -> GATING: Servo da nhanh 0 -> 180 -> 0 de loai bo lon loi!
+//             -> NG_HOME   : CUNG MO CAN GAT NHANH VE 0 (y het OK), cho can rut han 250ms (motorOff).
+//             -> NG_PASSING: Bat bang chuyen dua lon NG chay NG_EJECT_DELAY_MS toi vi tri gat.
+//             -> GATING    : Can gat vung manh 180 do danh vang lon NG, roi thu ve 0 do!
 // ============================================================================
 
-#define SLOW_FEED_ENABLE    1      // 1 = quay cham toi 180 do | 0 = chi code cu
+#define SLOW_FEED_ENABLE       1      // 1 = quay cham toi 180 do | 0 = chi code cu
 
-#define SERVO_HOME          0      // vi tri mo / cho ban dau (cho lon di qua)
-#define SERVO_FEED          180    // vi tri gat lon vao vi tri chup / chan lon
-#define SERVO_EJECT         180    // goc da nhanh toi da cua MG90S khi NG
+#define SERVO_HOME             0      // vi tri mo / thu can (cho lon di qua)
+#define SERVO_FEED             180    // vi tri gat lon vao vi tri chup / chan lon
+#define SERVO_EJECT            180    // goc vung manh de danh vang lon NG
 
-#define SLOW_FEED_TIME_MS   600    // tong thoi gian quay 180 do cham (ms)
-#define SLOW_RETURN_TIME_MS 400    // hoi servo cham khi ket qua OK (neu dung sweep)
-#define SLOW_FEED_REFRESH   20     // cap nhat goc moi 20ms
-#define NG_HOME_SETTLE_MS   150    // cho servo dung yen tai 0 truoc khi chay bang chuyen
-#define NG_PASS_TIMEOUT_MS  15000  // neu lon khong roi IR thi dung bang chuyen
-#define OK_PASS_TIMEOUT_MS  10000  // failsafe neu lon tot bi ket tren duong di
-#define STRIKE_HOLD_MS      350    // cho servo toi goc day lon truoc khi hoi ve
-#define STRIKE_RETURN_MS    550    // thoi gian cho truoc khi bang chuyen chay lai
-#define INSPECTION_FAILSAFE_MS 30000 // fallback neu PC mat ket noi
+// ==================== CẤU HÌNH CHẶN LON 2 GIAI ĐOẠN ====================
+// Giai đoạn 1: Vụt nhanh 0 -> 140 độ qua khoảng trống không chạm lon (300ms)
+// Giai đoạn 2: Đi siêu chậm 40 độ cuối (140 -> 180 độ) để êm ái ôm lon, KHÔNG HẤT LÙI LON (900ms)
+// Tổng thời gian chặn lon = 300ms + 900ms = 1200ms (1.2s - đúng chuẩn Bảng 9)
+#define FEED_FAST_ANGLE        140    // Goc quet nhanh qua khoang trong (do)
+#define FEED_FAST_TIME_MS      300    // Thoi gian quet nhanh 140 do dau (ms)
+#define FEED_SLOW_TIME_MS      900    // Thoi gian om cham 40 do cuoi (ms)
+#define SLOW_FEED_TIME_MS      (FEED_FAST_TIME_MS + FEED_SLOW_TIME_MS) // 1200ms
+
+#define GATE_OPEN_SETTLE_MS    250    // thoi gian cho can gat rut han ve 0 (250ms) truoc khi bat bang chuyen
+#define SLOW_FEED_REFRESH      20     // cap nhat goc moi 20ms
+
+// ==================== ĐỊNH THỜI GẠT LON NG ====================
+// Thoi gian bang chuyen dua lon NG chay tiep sau khi duoi lon roi IR de toi dung tam can gat (ms)
+// (Mac dinh cu la 450ms, tang len 580ms de lon di sau hon vao tam don danh cua can gat)
+#define NG_EJECT_DELAY_MS      580    
+
+#define NG_PASS_TIMEOUT_MS     15000  // neu lon khong roi IR thi dung bang chuyen
+#define OK_PASS_TIMEOUT_MS     10000  // failsafe neu lon tot bi ket tren duong di
+#define STRIKE_HOLD_MS         250    // cho servo vung toi goc danh lon (ms)
+#define STRIKE_RETURN_MS       350    // thoi gian thu servo ve vi tri san sang (ms)
+#define INSPECTION_FAILSAFE_MS 30000  // fallback neu PC mat ket noi
 
 Servo servo;
 
@@ -112,7 +123,20 @@ bool updateSlowSweep() {
   if (now - slowRefresh >= SLOW_FEED_REFRESH) {
     slowRefresh = now;
     unsigned long elapsed = now - slowStart;
-    int a = slowFrom + (int)(((long)(slowTo - slowFrom) * (long)elapsed) / (long)slowDuration);
+    int a;
+
+    // Chế độ chặn lon 2 giai đoạn: vụt nhanh qua khoảng trống, ôm cực êm 40 độ cuối
+    if (slowFrom == SERVO_HOME && slowTo == SERVO_FEED) {
+      if (elapsed < FEED_FAST_TIME_MS) {
+        a = (int)(((long)FEED_FAST_ANGLE * (long)elapsed) / (long)FEED_FAST_TIME_MS);
+      } else {
+        unsigned long el2 = elapsed - FEED_FAST_TIME_MS;
+        a = FEED_FAST_ANGLE + (int)(((long)(SERVO_FEED - FEED_FAST_ANGLE) * (long)el2) / (long)FEED_SLOW_TIME_MS);
+      }
+    } else {
+      a = slowFrom + (int)(((long)(slowTo - slowFrom) * (long)elapsed) / (long)slowDuration);
+    }
+
     if (a != slowAngle) {
       slowAngle = a;
       servoWrite(a);
@@ -139,6 +163,8 @@ unsigned long irReleaseTimer = 0;
 unsigned long waitingStartTime = 0;
 unsigned long ngPassStartTime = 0;
 unsigned long okPassStartTime = 0;
+unsigned long returningStartTime = 0;
+unsigned long ngHomeStartTime = 0;
 
 const char* STATE_STR[] = {
   "RUNNING", "FEEDING", "WAITING", "RETURNING", "OK_PASSING",
@@ -224,10 +250,10 @@ void setState(int nextState) {
       break;
 
     case FEEDING:
-      // Giu hanh vi code test: dung xung khi IR bao vat can; chi quay servo cham.
+      // IR bao vat can: dung xung PUL, servo quay 2 giai doan de nhe nhang om lon
       motorOff();
       startSlowSweep(SERVO_HOME, SERVO_FEED, SLOW_FEED_TIME_MS);
-      sendMsg("STATE=FEEDING SLOW_180\n");
+      sendMsg("STATE=FEEDING 2_STAGE\n");
       break;
 
     case WAITING:
@@ -239,15 +265,16 @@ void setState(int nextState) {
       break;
 
     case RETURNING:
+      // Lon tot: mo can gat nhanh ve 0 do, cho can rut han 250ms truoc khi bat motor
       motorOff();
-      startSlowSweep(SERVO_FEED, SERVO_HOME, SLOW_RETURN_TIME_MS);
-      sendMsg("STATE=RETURNING SLOW_HOME\n");
+      slowActive = false;
+      servoWrite(SERVO_HOME);
+      returningStartTime = millis();
+      sendMsg("STATE=RETURNING QUICK_OPEN\n");
       break;
 
     case OK_PASSING:
-      // Lon tot: mo thanh chan ve HOME (0 do) ngay va bat bang chuyen de lon di qua hoan toan.
-      slowActive = false;
-      servoWrite(SERVO_HOME);
+      // Can gat da o 0 do: bat bang chuyen cho lon tot di qua
       motorOn();
       okPassStartTime = millis();
       irReleaseTimer = digitalRead(IR_PIN) == OBSTACLE_STATE ? 0 : millis();
@@ -255,18 +282,20 @@ void setState(int nextState) {
       break;
 
     case NG_HOME:
-      // Ket qua NG: hoi thanh gat cham ve 0 truoc de mo duong cho lon di qua vi tri gat.
+      // Lon loi: CUNG MO CAN GAT NHANH VE 0 DO (y het lon OK), cho can rut han 250ms
       motorOff();
-      startSlowSweep(SERVO_FEED, SERVO_HOME, SLOW_RETURN_TIME_MS);
-      sendMsg("STATE=NG_HOME SLOW\n");
+      slowActive = false;
+      servoWrite(SERVO_HOME);
+      ngHomeStartTime = millis();
+      sendMsg("STATE=NG_HOME QUICK_OPEN\n");
       break;
 
     case NG_PASSING:
-      // Servo da o 0; cho bang chuyen dua lon toi vi tri gat.
+      // Can gat da o 0 do: bat bang chuyen dua lon toi vi tri gat
       motorOn();
       ngPassStartTime = millis();
       irReleaseTimer = digitalRead(IR_PIN) == OBSTACLE_STATE ? 0 : millis();
-      sendMsg("STATE=NG_PASSING WAIT_IR_CLEAR_500MS\n");
+      sendMsg("STATE=NG_PASSING WAIT_IR_CLEAR\n");
       break;
 
     case NG_FAULT:
@@ -275,7 +304,7 @@ void setState(int nextState) {
       break;
 
     case GATING:
-      // Lon da roi IR 500ms; thuc hien cu gat nhanh 0 -> 180 -> 0 de loai bo lon.
+      // Lon da toi dung vi tri gat: vung manh 180 do de danh vang lon loi
       slowActive = false;
       motorOff();
       gatingStep = 0;
@@ -285,7 +314,7 @@ void setState(int nextState) {
   }
 }
 
-// Chuc nang NG -> quet nhanh 0 -> 180 -> 0 sau khi IR clear lien tuc 500ms.
+// Chuc nang NG -> quet nhanh 0 -> 180 -> 0 sau khi lon toi vi tri gat
 void runGating() {
   switch (gatingStep) {
     case 0:
@@ -339,9 +368,9 @@ void handleCmd(String cmd) {
 
   if (state == WAITING) {
       if (upper == "OK") {
-        setState(OK_PASSING);   // Lon tot: mo thanh chan, cho chay qua hoan toan
+        setState(RETURNING);    // Lon tot: mo can gat nhanh ve 0, cho 250ms roi moi chay bang chuyen
       } else if (upper == "NG") {
-        setState(NG_HOME);      // Lon loi: hoi ve 0 de dua lon toi goc gat
+        setState(NG_HOME);      // Lon loi: CUNG mo can gat nhanh ve 0, cho 250ms roi chay toi cho danh lon
       }
   }
 
@@ -356,13 +385,12 @@ void updateState() {
 
   switch (state) {
     case RUNNING:
-      // Chi kich hoat khi CÓ LON MỚI ĐẾN (chuyen tu khong can sang co can)
+      // Chi kich hoat khi CO LON MOI DEN (chuyen tu khong can sang co can)
       if (lastIR != OBSTACLE_STATE && ir == OBSTACLE_STATE) {
 #if SLOW_FEED_ENABLE
-        // MOI: lon cham hong ngoai -> quay cham toi 180 do de dua lon vao vi tri
+        // lon cham hong ngoai -> quay 2 giai doan nhe nhang om lon
         setState(FEEDING);
 #else
-        // CODE CU: dung bang chuyen + chup anh ngay, servo khong quay cham
         setState(WAITING);
 #endif
       } else {
@@ -371,10 +399,8 @@ void updateState() {
       break;
 
     case FEEDING:
-      // IR vua phat hien lon: dung PUL, servo quay cham trong khi bang chuyen dung
       motorOff();
       if (updateSlowSweep()) {
-        // Da quay du 180 do -> dung bang chuyen, cho AI
         setState(WAITING);
       }
       break;
@@ -389,8 +415,8 @@ void updateState() {
       if (irReleaseTimer && millis() - irReleaseTimer >= 500 &&
           millis() - waitingStartTime >= INSPECTION_FAILSAFE_MS) {
         irReleaseTimer = 0;
-        sendMsg("INSPECTION_TIMEOUT -> OK_PASSING\n");
-        setState(OK_PASSING);
+        sendMsg("INSPECTION_TIMEOUT -> RETURNING\n");
+        setState(RETURNING);
       } else {
         motorOff();
         if (millis() - lastWaitNotifyTime >= 5000) {
@@ -402,7 +428,8 @@ void updateState() {
 
     case RETURNING:
       motorOff();
-      if (updateSlowSweep()) {
+      // Cho 250ms cho can gat rut han ve 0 do (khong con cham lon)
+      if (millis() - returningStartTime >= GATE_OPEN_SETTLE_MS) {
         sendMsg("SERVO_HOME_DONE\n");
         setState(OK_PASSING);
       }
@@ -417,8 +444,8 @@ void updateState() {
         irReleaseTimer = millis();  // Bat dau thay duoi lon thoat khoi mat cam bien
       }
 
-      // Khi mat doc IR da thong thoang lien tuc 800ms -> lon da di qua hoan toan!
-      if (irReleaseTimer && millis() - irReleaseTimer >= 800) {
+      // Khi mat doc IR da thong thoang lien tuc 600ms -> lon da di qua hoan toan!
+      if (irReleaseTimer && millis() - irReleaseTimer >= 600) {
         sendMsg("OK_CAN_PASSED\n");
         setState(RUNNING);
       } else if (millis() - okPassStartTime >= OK_PASS_TIMEOUT_MS) {
@@ -429,11 +456,10 @@ void updateState() {
 
     case NG_HOME:
       motorOff();
-      if (updateSlowSweep()) {
-        // Cho servo o home mot chut roi moi bat bang chuyen.
-        if (millis() - slowStart >= SLOW_RETURN_TIME_MS + NG_HOME_SETTLE_MS) {
-          setState(NG_PASSING);
-        }
+      // Cho 250ms cho can gat rut han ve 0 do y het lon OK
+      if (millis() - ngHomeStartTime >= GATE_OPEN_SETTLE_MS) {
+        sendMsg("NG_GATE_OPEN_DONE\n");
+        setState(NG_PASSING);
       }
       break;
 
@@ -444,9 +470,10 @@ void updateState() {
         irReleaseTimer = millis();
       }
 
-      if (irReleaseTimer && millis() - irReleaseTimer >= 500) {
+      // Khi duoi lon vua thoat khoi IR lien tuc NG_EJECT_DELAY_MS (580ms) -> lon da toi dung tam can gat
+      if (irReleaseTimer && millis() - irReleaseTimer >= NG_EJECT_DELAY_MS) {
         motorOff();
-        sendMsg("IR_CLEAR_500MS -> EJECT\n");
+        sendMsg("IR_CLEAR_REACHED -> EJECT\n");
         setState(GATING);
       } else if (millis() - ngPassStartTime >= NG_PASS_TIMEOUT_MS) {
         motorOff();
@@ -510,9 +537,9 @@ void setup() {
   sendMsg("ESP_READY STATE=RUNNING\n");
   sendMsg("PIN SERVO=%d IR=%d PUL=%d\n", SERVO_PIN, IR_PIN, PUL_PIN);
   sendMsg("PUL MODE=ACTIVE_LOW STEP_DELAY_US=%d\n", STEP_DELAY_US);
-  sendMsg("SERVO HOME=%d FEED=%d EJECT=%d SLOW=%dms\n",
-          SERVO_HOME, SERVO_FEED, SERVO_EJECT, SLOW_FEED_TIME_MS);
-  sendMsg("SLOW_FEED_ENABLE=%d (1=quay 90 cham, 0=chi code cu)\n", SLOW_FEED_ENABLE);
+  sendMsg("SERVO HOME=%d FEED=%d EJECT=%d SLOW=%dms NG_DELAY=%dms\n",
+          SERVO_HOME, SERVO_FEED, SERVO_EJECT, SLOW_FEED_TIME_MS, NG_EJECT_DELAY_MS);
+  sendMsg("SLOW_FEED_ENABLE=%d\n", SLOW_FEED_ENABLE);
   sendMsg("WIFI_IP=%s\n", wifiConnected ? WiFi.localIP().toString().c_str() : "DISCONNECTED");
 }
 
@@ -522,6 +549,10 @@ unsigned long wifiRetryStepTimer = 0;
 
 // ====================== LOOP ======================
 void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    wifiConnected = false;
+  }
+
   if (!wifiConnected) {
     if (!wifiRetrying && millis() - wifiRetryTimer >= 30000) {
       wifiRetryTimer = millis();

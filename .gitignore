@@ -1,4 +1,6 @@
 models/*.pkl
+models/*_backup.pth
+models/*_2500.pth
 models/datasets/
 captures/
 results/
