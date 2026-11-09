@@ -68,7 +68,7 @@ bool aiEnabled = true;
 
 // ==================== ĐỊNH THỜI GẠT LON NG (CHO MG996R) ====================
 // Thoi gian bang chuyen dua lon NG chay tiep sau khi duoi lon roi IR de toi dung tam can gat (ms)
-#define NG_EJECT_DELAY_MS      750    
+#define NG_EJECT_DELAY_MS      900  
 
 #define NG_PASS_TIMEOUT_MS     15000  // neu lon khong roi IR thi dung bang chuyen
 #define OK_PASS_TIMEOUT_MS     10000  // failsafe neu lon tot bi ket tren duong di
@@ -385,7 +385,7 @@ void handleCmd(String cmd) {
   }
 
   // Lenh test tay (Serial hoac TCP)
-  if (upper == "FEED")   { setState(FEEDING); return; }   // quay cham toi 165 do
+  if (upper == "FEED")   { setState(FEEDING); return; }   // quay cham toi 180 do
   if (upper == "STRIKE") { setState(GATING);  return; }   // danh lon toc do cao
   if (upper == "HOME")   {
     slowActive = false;
