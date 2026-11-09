@@ -1,6 +1,14 @@
-ultralytics
-fastapi
-uvicorn[standard]
-opencv-python
-numpy
-PyYAML
+# Core Deep Learning & Computer Vision (DRAEM & YOLOv8)
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+
+# Backend Server & Real-time Web Dashboard (FastAPI)
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+
+# Data Processing & Analysis Visualizations
+numpy>=1.24.0
+PyYAML>=6.0
+matplotlib>=3.7.0
