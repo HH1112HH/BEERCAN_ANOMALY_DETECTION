@@ -190,7 +190,7 @@ class DRAEM:
             # 2. Bản đồ lỗi Discriminative Net (chuẩn bài báo)
             pm = pred_mask[0, 0].cpu().numpy()
 
-            # 👉 BÍ QUYẾT TRIỆT TIÊU VÒNG SÁNG: Hiệu số tái tạo giữa ảnh gốc và ảnh tái tạo
+            # BÍ QUYẾT TRIỆT TIÊU VÒNG SÁNG: Hiệu số tái tạo giữa ảnh gốc và ảnh tái tạo
             diff_map = torch.abs(input_tensor - rec)[0].cpu().numpy().mean(axis=0)
             norm_map = np.clip(diff_map / (self.threshold * 0.3 + 1e-6), 0.0, 1.0)
 

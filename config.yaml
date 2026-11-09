@@ -13,10 +13,6 @@ draem:
 esp:
   conveyor_port: 12345
   ip: 192.168.1.54
-patchcore:
-  device: cuda:0
-  model: models/patchcore_model.pkl
-  threshold: 0.0873
 server:
   host: 0.0.0.0
   port: 5004

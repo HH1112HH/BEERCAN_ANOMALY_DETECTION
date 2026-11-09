@@ -89,19 +89,19 @@ def main():
     mode_desc = "LON TỐT (TRAIN_OK)" if "train_ok" in str(save_dir) else ("LON LỖI (TEST_NG)" if "test_ng" in str(save_dir) else str(save_dir))
 
     print("\n" + "=" * 64)
-    print(" 📸 HỆ THỐNG CHỤP ẢNH RAW LON TRÊN BĂNG CHUYỀN (AUTO INDEX)")
+    print(" HỆ THỐNG CHỤP ẢNH RAW LON TRÊN BĂNG CHUYỀN (AUTO INDEX)")
     print("=" * 64)
-    print(f" [🎯] Mục tiêu thu thập    : {mode_desc}")
-    print(f" [📁] Thư mục lưu ảnh RAW : {save_dir.resolve()}")
-    print(f" [🔢] Tên file tiếp theo   : can_{can_idx}.jpg")
-    print(" [💡] Cách dùng lệnh:")
+    print(f" [*] Mục tiêu thu thập    : {mode_desc}")
+    print(f" [-] Thư mục lưu ảnh RAW : {save_dir.resolve()}")
+    print(f" [#] Tên file tiếp theo   : can_{can_idx}.jpg")
+    print(" [i] Cách dùng lệnh:")
     print("      - cap           -> Chụp lon tốt (dataset/train_ok) tiếp tục từ file cao nhất")
     print("      - cap ng        -> Chụp lon lỗi (dataset/test_ng) tiếp tục từ file cao nhất")
     print("      - cap test_ok   -> Chụp lon test (dataset/test_ok)")
-    print(" [⌨️] Phím tắt trong cửa sổ:")
+    print(" [+] Phím tắt trong cửa sổ:")
     print("      - SPACE / Phím C : Chụp ngay 1 ảnh thủ công")
     print("      - Q / ESC        : Dừng chương trình")
-    print(" [🔄] Tự động: Cảm biến IR nhận lon -> Dừng ổn định -> Chụp -> Cho lon đi")
+    print(" [>] Tự động: Cảm biến IR nhận lon -> Dừng ổn định -> Chụp -> Cho lon đi")
     print("=" * 64 + "\n")
 
     # 1. Khởi tạo Camera RTSP
@@ -134,9 +134,9 @@ def main():
             conveyor.send("START")
             time.sleep(0.3)
             conveyor.clear_buffer()
-            logger.info("🚀 Băng chuyền sẵn sàng! Hãy thả lon vào...")
+            logger.info("Bang chuyen san sang! Hay tha lon vao...")
         else:
-            logger.warning("⚠️ Chưa kết nối được ESP8266. Bạn vẫn có thể bấm phím SPACE để chụp thủ công.")
+            logger.warning("Chua ket noi duoc ESP8266. Ban van co the bam phim SPACE de chup thu cong.")
 
     flash_text = ""
     flash_timer = 0
@@ -220,9 +220,9 @@ def main():
         if conveyor:
             conveyor.disconnect()
         print("\n" + "=" * 60)
-        print(f" [✓] HOÀN TẤT! Đã chụp thêm: {captured_count} ảnh RAW.")
-        print(f" [📁] Vị trí ảnh: {save_dir.resolve()}")
-        print(f" [🔢] File cuối cùng hiện tại: can_{can_idx - 1}.jpg")
+        print(f" [OK] HOÀN TẤT! Đã chụp thêm: {captured_count} ảnh RAW.")
+        print(f" [-] Vị trí ảnh: {save_dir.resolve()}")
+        print(f" [#] File cuối cùng hiện tại: can_{can_idx - 1}.jpg")
         print("=" * 60 + "\n")
 
 

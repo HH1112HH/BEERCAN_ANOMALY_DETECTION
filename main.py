@@ -22,10 +22,6 @@ import image_logger
 
 # Anomaly models
 from draem_model import DRAEM
-try:
-    from patch_core import PatchCore
-except Exception as e:
-    PatchCore = None
 
 
 class _NoConveyor:
@@ -63,31 +59,19 @@ detector = YOLODetector(
     imgsz=cfg["yolo"].get("imgsz", 960),
 )
 
-anomaly_algo = cfg.get("anomaly", {}).get("algorithm", "draem")
+anomaly_algo = "draem"
 draem = None
-patch_core = None
 
 if "draem" in cfg:
     try:
         draem = DRAEM(
             model_path=cfg["draem"]["model"],
-            threshold=cfg["draem"].get("threshold", 0.65),
+            threshold=cfg["draem"].get("threshold", 0.25),
             device=cfg["draem"].get("device", "cuda:0"),
         )
         logger.info("DRAEM model initialized")
     except Exception as e:
         logger.error(f"Failed to load DRAEM model: {e}")
-
-if "patchcore" in cfg and PatchCore is not None:
-    try:
-        patch_core = PatchCore(
-            model_path=cfg["patchcore"]["model"],
-            threshold=cfg["patchcore"]["threshold"],
-            device=cfg["patchcore"].get("device", "cuda:0"),
-        )
-        logger.info("PatchCore model initialized")
-    except Exception as e:
-        logger.warning(f"Could not load PatchCore: {e}")
 
 classifier = Classifier()
 conveyor = ConveyorController(
@@ -243,14 +227,10 @@ def do_inspection(trigger_time: float, retry_detect: bool = True):
         conveyor.clear_buffer()
         return
 
-    # Anomaly inference
-    if anomaly_algo == "draem" and draem is not None:
+    # Anomaly inference (DRAEM)
+    if draem is not None:
         model_res = draem.check(roi, mask=mask, need_heatmap=True)
         model_tag = "DRAEM"
-    elif patch_core is not None:
-        model_res = patch_core.check(roi, need_heatmap=True)
-        model_res["algo"] = "patchcore"
-        model_tag = "PatchCore"
     else:
         model_res = {"algo": "none", "defect": False, "score": 0.0, "reason": "No model loaded"}
         model_tag = "NONE"
@@ -470,9 +450,8 @@ async def get_status():
         "processing": processing_enabled,
         "status_text": last_status_text,
         "last_verdict": last_verdict,
-        "algo": anomaly_algo,
-        "draem_threshold": draem.threshold if draem else 0.40,
-        "patchcore_threshold": patch_core.threshold if patch_core else 0.087,
+        "algo": "draem",
+        "draem_threshold": draem.threshold if draem else 0.25,
         "conf_threshold": detector.conf,
         "session_id": active_session["id"],
         "session_name": active_session["name"],
@@ -584,10 +563,6 @@ async def set_threshold(data: dict):
         draem.threshold = value
         cfg["draem"]["threshold"] = value
         logger.info(f"Updated DRAEM threshold to {value:.4f}")
-    elif algo == "patchcore" and patch_core is not None:
-        patch_core.threshold = value
-        cfg["patchcore"]["threshold"] = value
-        logger.info(f"Updated PatchCore threshold to {value:.4f}")
     elif algo == "conf":
         detector.conf = value
         DETECT_CONF = value

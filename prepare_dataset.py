@@ -130,15 +130,15 @@ def main():
     aug_factor = 1 if args.no_aug else max(1, args.aug_factor)
 
     print("\n" + "=" * 70)
-    print(" 🛠️  CHUẨN BỊ DATASET DRAEM: CẮT ÔM SÁT 100% & TĂNG CƯỜNG DỮ LIỆU CẤP 1")
+    print(" CHUẨN BỊ DATASET DRAEM: CẮT ÔM SÁT 100% & TĂNG CƯỜNG DỮ LIỆU CẤP 1")
     print(f"     Hệ số tăng cường dữ liệu : x{aug_factor} (Mỗi lon train sinh {aug_factor} biến thể)")
     print("=" * 70)
 
     ok_files = sorted(glob.glob("dataset/train_ok/*.jpg") + glob.glob("dataset/train_ok/*.png"))
     ng_files = sorted(glob.glob("dataset/test_ng/*.jpg") + glob.glob("dataset/test_ng/*.png"))
 
-    print(f" [📸] Tổng số ảnh lon OK tìm thấy : {len(ok_files)}")
-    print(f" [🚨] Tổng số ảnh lon NG tìm thấy : {len(ng_files)}")
+    print(f" [*] Tổng số ảnh lon OK tìm thấy : {len(ok_files)}")
+    print(f" [*] Tổng số ảnh lon NG tìm thấy : {len(ng_files)}")
 
     if not ok_files:
         print("[!] Lỗi: Không tìm thấy ảnh lon OK nào trong dataset/train_ok!")
@@ -252,10 +252,10 @@ def main():
     shutil.copyfile(zip_path, "data_labeled.zip")
 
     print("\n" + "=" * 70)
-    print(f" [✓] HOÀN TẤT THÀNH CÔNG!")
-    print(f" [📦] File nén đã tạo        : {zip_path.resolve()}")
-    print(f" [📊] Dung lượng file zip    : {zip_size_mb:.2f} MB")
-    print(f" [📈] Thống kê tập ảnh       :")
+    print(f" [OK] HOÀN TẤT THÀNH CÔNG!")
+    print(f" [-] File nén đã tạo        : {zip_path.resolve()}")
+    print(f" [-] Dung lượng file zip    : {zip_size_mb:.2f} MB")
+    print(f" [*] Thống kê tập ảnh       :")
     print(f"      + Train OK (Augmented): {total_saved:,} ảnh (Từ {len(train_ok_list)} lon thực tế)")
     print(f"      + Test OK (Thực tế)   : {len(test_ok_list):,} ảnh")
     print(f"      + Test NG (Thực tế)   : {len(ng_files):,} ảnh")

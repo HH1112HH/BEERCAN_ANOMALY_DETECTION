@@ -37,7 +37,7 @@ from torchvision import transforms
 plt.rcParams['figure.dpi'] = 120
 sns.set_theme(style="whitegrid")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"\\n[✓] Môi trường thực thi: {device} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
+print(f"\\n[OK] Môi trường thực thi: {device} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
 '''
 cells.append(make_cell(c0))
 
@@ -51,7 +51,7 @@ if os.path.exists(zip_name):
     print(f'[*] Đang dọn dẹp thư mục cũ và giải nén {zip_name}...')
     !rm -rf dataset_labeled
     !unzip -q -o {zip_name}
-    print('[✓] Giải nén xong!')
+    print('[OK] Giải nén xong!')
 else:
     print(f'[!] Hãy upload file {zip_name} từ D:\\\\bc_moi lên mục Files của Colab trước.')
 
@@ -318,7 +318,7 @@ if train_paths:
     plt.tight_layout()
     plt.savefig("synthetic_anomaly_samples.png", dpi=200)
     plt.show()
-    print("[✓] Đã lưu minh họa: 'synthetic_anomaly_samples.png'")
+    print("[OK] Đã lưu minh họa: 'synthetic_anomaly_samples.png'")
 '''
 cells.append(make_cell(c3))
 
@@ -426,9 +426,9 @@ recon_net = ReconstructiveSubNetwork().to(device)
 discr_net = DiscriminativeSubNetwork().to(device)
 
 def count_params(m): return sum(p.numel() for p in m.parameters() if p.requires_grad)
-print(f"[✓] Reconstructive Network : {count_params(recon_net):,} tham số huấn luyện")
-print(f"[✓] Discriminative Network : {count_params(discr_net):,} tham số huấn luyện")
-print(f"[✓] Tổng tham số DRAEM     : {count_params(recon_net)+count_params(discr_net):,} tham số")
+print(f"[OK] Reconstructive Network : {count_params(recon_net):,} tham số huấn luyện")
+print(f"[OK] Discriminative Network : {count_params(discr_net):,} tham số huấn luyện")
+print(f"[OK] Tổng tham số DRAEM     : {count_params(recon_net)+count_params(discr_net):,} tham số")
 '''
 cells.append(make_cell(c4))
 
@@ -464,7 +464,7 @@ def focal_loss(pred_mask, gt_mask, gamma=4.0, alpha=0.5):
     fl   = alpha * ((1 - pt) ** gamma) * bce
     return fl.mean()
 
-print("[✓] Đã định nghĩa 3 hàm mất mát: SSIM Loss, Reconstruction Loss, Focal Loss (gamma=4.0)")
+print("[OK] Đã định nghĩa 3 hàm mất mát: SSIM Loss, Reconstruction Loss, Focal Loss (gamma=4.0)")
 '''
 cells.append(make_cell(c5))
 
@@ -493,7 +493,7 @@ class DRAEMDataset(Dataset):
     def __getitem__(self, idx):
         img = self.images[idx]
 
-        # 👉 QUAN TRỌNG: 50% ảnh bơm lỗi giả, 50% giữ nguyên lon sạch hoàn toàn
+        # -> QUAN TRỌNG: 50% ảnh bơm lỗi giả, 50% giữ nguyên lon sạch hoàn toàn
         if random.random() < 0.5:
             aug, mask = apply_random_anomaly(img, self.paths, size=self.img_size)
         else:
@@ -541,7 +541,7 @@ for epoch in range(1, NUM_EPOCHS + 1):
         # 1. Forward Mạng Khôi Phục (Reconstructive Subnetwork)
         recon = recon_net(aug_img)
 
-        # 2. 👉 BÍ QUYẾT recon.detach(): Ngăn Discriminator phá vỡ khả năng nắn phẳng lon của Recon Net
+        # 2. -> BÍ QUYẾT recon.detach(): Ngăn Discriminator phá vỡ khả năng nắn phẳng lon của Recon Net
         disc_input = torch.cat([aug_img, recon.detach()], dim=1)
         pred_mask  = discr_net(disc_input)
 
@@ -578,13 +578,13 @@ for epoch in range(1, NUM_EPOCHS + 1):
               f"Focal: {loss_history['focal'][-1]:.4f}")
 
 elapsed = time.time() - start_t
-print(f"\\n[✓] Huấn luyện hoàn tất trong {elapsed/60:.2f} phút!")
+print(f"\\n[OK] Huấn luyện hoàn tất trong {elapsed/60:.2f} phút!")
 
 torch.save({
     'recon_state': recon_net.state_dict(),
     'discr_state': discr_net.state_dict(),
 }, "draem_fulldata.pth")
-print("[✓] Đã lưu trọng số mô hình: 'draem_fulldata.pth'")
+print("[OK] Đã lưu trọng số mô hình: 'draem_fulldata.pth'")
 
 # Vẽ biểu đồ loss
 epochs_arr = range(1, NUM_EPOCHS + 1)
@@ -598,7 +598,7 @@ plt.title(f"Đường cong hội tụ hàm mất mát DRAEM (100 Epochs)", fonts
 plt.xlabel("Epoch", fontsize=11); plt.ylabel("Loss", fontsize=11); plt.legend(fontsize=9)
 plt.grid(True, linestyle=':', alpha=0.6); plt.tight_layout()
 plt.savefig("draem_loss_curve.png", dpi=300); plt.show()
-print("[✓] Đã lưu: 'draem_loss_curve.png'")
+print("[OK] Đã lưu: 'draem_loss_curve.png'")
 '''
 cells.append(make_cell(c6))
 
@@ -636,10 +636,10 @@ std_s  = float(np.std(test_normal_scores))
 # Ngưỡng = Percentile 98% + 0.1 * std (Chuẩn xác như code gốc)
 threshold = float(np.percentile(test_normal_scores, 98.0)) + 0.1 * std_s
 
-print(f"[✓] Điểm bất thường TB (lon chuẩn) : {mean_s:.4f} ± {std_s:.4f}")
-print(f"[★] NGƯỠNG PHÂN LOẠI (THRESHOLD)   : {threshold:.4f}")
-print(f"    → Score > {threshold:.4f} : 🔴 LON LỖI (NG)")
-print(f"    → Score ≤ {threshold:.4f} : 🟢 LON ĐẠT (OK)")
+print(f"[OK] Điểm bất thường TB (lon chuẩn) : {mean_s:.4f} ± {std_s:.4f}")
+print(f"[*] NGƯỠNG PHÂN LOẠI (THRESHOLD)   : {threshold:.4f}")
+print(f"    → Score > {threshold:.4f} : [NG] LON LỖI (NG)")
+print(f"    → Score ≤ {threshold:.4f} : [OK] LON ĐẠT (OK)")
 
 # ── Tính score cho toàn bộ NG ─────────────────────────────────────────────
 print(f"\\n[*] Đang tính điểm Anomaly Score trên {len(ng_paths):,} ảnh NG...")
@@ -649,14 +649,14 @@ for p in tqdm(ng_paths, desc="Test-NG", leave=False):
     if s is not None: ng_scores.append(s)
 
 ng_scores = np.array(ng_scores)
-print(f"[✓] Score TB của NG : {ng_scores.mean():.4f} ± {ng_scores.std():.4f}")
-print(f"[✓] Score TB của OK : {test_normal_scores.mean():.4f}")
+print(f"[OK] Score TB của NG : {ng_scores.mean():.4f} ± {ng_scores.std():.4f}")
+print(f"[OK] Score TB của OK : {test_normal_scores.mean():.4f}")
 
 # Cập nhật checkpoint với threshold
 ckpt = torch.load("draem_fulldata.pth", map_location=device)
 ckpt['threshold'] = threshold
 torch.save(ckpt, "draem_fulldata.pth")
-print("\\n[✓] Đã lưu threshold vào: 'draem_fulldata.pth'")
+print("\\n[OK] Đã lưu threshold vào: 'draem_fulldata.pth'")
 
 # Vẽ 3 biểu đồ phân phối điểm số
 fig, axes = plt.subplots(1, 3, figsize=(20, 5))
@@ -696,7 +696,7 @@ ax3.legend(fontsize=10); ax3.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig('draem_score_distribution.png', dpi=300)
 plt.show()
-print("[✓] Đã lưu: 'draem_score_distribution.png'")
+print("[OK] Đã lưu: 'draem_score_distribution.png'")
 '''
 cells.append(make_cell(c7))
 
@@ -721,7 +721,7 @@ def inspect_draem(image_path_or_arr, recon_net, discr_net, threshold, device):
         pred_mask = discr_net(disc_in)
     latency = (time.time() - t0) * 1000
 
-    # 👉 BÍ QUYẾT TRIỆT TIÊU 100% VÒNG SÁNG: Hiệu số tái tạo giữa ảnh gốc và ảnh tái tạo
+    # -> BÍ QUYẾT TRIỆT TIÊU 100% VÒNG SÁNG: Hiệu số tái tạo giữa ảnh gốc và ảnh tái tạo
     diff_map = torch.abs(t - recon)[0].cpu().numpy().mean(axis=0)
     norm_map = np.clip(diff_map / (threshold * 0.3), 0.0, 1.0)
     heatmap  = cv2.applyColorMap((norm_map * 255).astype(np.uint8), cv2.COLORMAP_JET)
@@ -752,14 +752,14 @@ for ax, c in zip(axes[0], cols):
     ax.set_title(c, fontsize=11, fontweight='bold')
 
 for row, (r, lbl) in enumerate(zip(samples_ok, ["OK lon 1", "OK lon 2"])):
-    axes[row, 0].imshow(r['orig']);    axes[row, 0].set_ylabel(f"{lbl}\\nScore: {r['score']:.4f}\\n{'🟢 OK'}", fontsize=10, fontweight='bold', color='forestgreen')
+    axes[row, 0].imshow(r['orig']);    axes[row, 0].set_ylabel(f"{lbl}\\nScore: {r['score']:.4f}\\n{'[OK] OK'}", fontsize=10, fontweight='bold', color='forestgreen')
     axes[row, 1].imshow(np.clip(r['recon'], 0, 1))
     axes[row, 2].imshow(r['mask'], cmap='hot', vmin=0, vmax=1)
     axes[row, 3].imshow(r['overlay'])
     for ax in axes[row]: ax.set_xticks([]); ax.set_yticks([])
 
 for row, (r, lbl) in enumerate(zip(samples_ng, ["NG lon 1", "NG lon 2"])):
-    label_text = '🔴 NG (Phát hiện)' if r['is_ng'] else '⚠️ NG (Bỏ sót)'
+    label_text = '[NG] NG (Phát hiện)' if r['is_ng'] else '[WARN] NG (Bỏ sót)'
     axes[2+row, 0].imshow(r['orig']); axes[2+row, 0].set_ylabel(f"{lbl}\\nScore: {r['score']:.4f}\\n{label_text}", fontsize=10, fontweight='bold', color='crimson')
     axes[2+row, 1].imshow(np.clip(r['recon'], 0, 1))
     axes[2+row, 2].imshow(r['mask'], cmap='hot', vmin=0, vmax=1)
@@ -771,7 +771,7 @@ plt.suptitle("DRAEM – Trực quan hóa Heatmap pixel-level\\n2 lon OK (trên) 
 plt.tight_layout()
 plt.savefig("draem_heatmap_comparison.png", dpi=200)
 plt.show()
-print("[✓] Đã lưu: 'draem_heatmap_comparison.png'")
+print("[OK] Đã lưu: 'draem_heatmap_comparison.png'")
 '''
 cells.append(make_cell(c8))
 
@@ -785,8 +785,8 @@ from sklearn.metrics import (confusion_matrix, accuracy_score, precision_score,
 print("=" * 62)
 print("  ĐÁNH GIÁ ĐỘ CHÍNH XÁC TOÀN DIỆN MÔ HÌNH DRAEM")
 print("=" * 62)
-print(f"[✓] Lon tốt (OK - Label 0): {len(test_paths)} ảnh")
-print(f"[✓] Lon lỗi (NG - Label 1): {len(ng_paths)} ảnh")
+print(f"[OK] Lon tốt (OK - Label 0): {len(test_paths)} ảnh")
+print(f"[OK] Lon lỗi (NG - Label 1): {len(ng_paths)} ảnh")
 
 y_true, y_pred, all_scores, all_times = [], [], [], []
 
@@ -856,7 +856,7 @@ axes[1].legend(loc='lower right', fontsize=9); axes[1].grid(True, linestyle=':',
 plt.tight_layout()
 plt.savefig("draem_danh_gia_mo_hinh.png", dpi=300, bbox_inches='tight')
 plt.show()
-print("[✓] Đã lưu: 'draem_danh_gia_mo_hinh.png'  ← Dùng thẳng vào báo cáo KLTN!")
+print("[OK] Đã lưu: 'draem_danh_gia_mo_hinh.png'  ← Dùng thẳng vào báo cáo KLTN!")
 '''
 cells.append(make_cell(c9))
 
@@ -872,12 +872,12 @@ save_dict = {
 }
 
 torch.save(save_dict, 'draem.pth')
-print("\\n[✓] ĐÃ LƯU FILE: draem.pth THÀNH CÔNG!")
+print("\\n[OK] ĐÃ LƯU FILE: draem.pth THÀNH CÔNG!")
 print(f"[*] Ngưỡng Threshold đã lưu kèm trong model: {threshold:.4f}")
 
 from google.colab import files
 files.download('draem.pth')
-print("[✓] Đang tự động tải draem.pth về máy tính của bạn...")
+print("[OK] Đang tự động tải draem.pth về máy tính của bạn...")
 '''
 cells.append(make_cell(c10))
 
