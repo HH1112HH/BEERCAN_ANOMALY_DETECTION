@@ -1,43 +1,90 @@
-# BeerCan Anomaly Detection
+# BeerCan DRAEM - Automated Visual Inspection System
 
-Hệ thống kiểm tra lon gồm backend Python/FastAPI, ESP và giao diện React/Vite có thể deploy riêng.
+Hệ thống kiểm tra lỗi bề mặt đáy lon bia tự động ứng dụng Trí tuệ Nhân tạo (Computer Vision & Deep Learning) kết hợp băng tải và cơ cấu gạt phân loại lon lỗi sử dụng ESP8266 & Servo MG996R.
 
-## Cấu trúc
+---
 
-- `main.py`: camera, phát hiện lon, kiểm tra bất thường và API FastAPI.
-- `frontend/`: giao diện React/Vite; không chứa model weights hay thông tin camera.
-- `backend_asgi.py`: ASGI entry point có CORS cho frontend chạy khác origin.
-- `docs/ANOMALY_MODELS_INTEGRATION.md`: kế hoạch tích hợp DRAEM và SK-RD4AD sau khi train.
-- `DESIGN.md`: hướng dẫn giao diện theo Open Design để dùng lại cho các lần thiết kế sau.
+## 1. Kiến trúc Hệ thống
 
-## Chạy frontend riêng
+- **Phát hiện lon (Can Detection & Alignment):** YOLOv8 phát hiện tọa độ lon theo thời gian thực và thực hiện cắt tròn viền đáy lon chính xác (snug circular crop).
+- **Phát hiện bất thường (Anomaly Detection):** Mô hình DRAEM (Discriminative Reconstructive Anomaly Embedding) tự giám sát, tái tạo ảnh chuẩn và sinh Heatmap lỗi bề mặt (vết móp, trầy xước, dị vật).
+- **Phân loại & Ra quyết định (Classifier):** Ngưỡng Anomaly Score (mặc định 0.25) phân định lon GOOD và NG.
+- **Điều khiển Băng tải & Phân loại (Hardware Control):** ESP8266 điều khiển Servo kim loại MG996R gạt lon NG với độ trễ băng tải 900ms.
+- **Giao diện Giám sát (Dashboard UI):** FastAPI phục vụ giao diện Web thời gian thực tại `http://localhost:5004`, hỗ trợ xem trực tiếp camera, heatmap, lịch sử kiểm tra và xuất báo cáo CSV/SQLite.
 
-```bash
-cd frontend
-npm ci
-npm run dev
+---
+
+## 2. Cấu trúc Thư mục
+
+```text
+d:\bc_moi\
+├── main.py                     # Entry point chính: FastAPI, WebSocket và Inspection Pipeline
+├── camera_service.py           # Quản lý luồng video RTSP từ camera công nghiệp / webcam
+├── detector.py                 # Nhận diện vị trí lon và cắt tròn ôm sát bằng YOLOv8
+├── draem_model.py              # Mô hình DRAEM (Reconstructor & Discriminative Sub-network)
+├── classifier.py               # Logic phân loại GOOD / NG dựa trên điểm số bất thường
+├── conveyor_controller.py      # Module giao tiếp HTTP/Serial với ESP8266
+├── db_manager.py               # Quản lý cơ sở dữ liệu SQLite lưu trữ lịch sử kiểm tra
+├── image_logger.py             # Lưu trữ hình ảnh chụp lon, ROI và Heatmap
+├── prepare_dataset.py          # Script tiền xử lý và tăng cường dữ liệu huấn luyện
+├── cap.py                      # Công cụ chụp ảnh thu thập mẫu từ camera
+├── cap.bat / cap.ps1           # Phím tắt chạy nhanh công cụ chụp ảnh
+├── config.yaml                 # File cấu hình toàn bộ hệ thống (Camera, Model, ESP, Server)
+├── requirements.txt            # Danh sách thư viện Python cần thiết
+│
+├── static/                     # Giao diện Web Dashboard (HTML5, Modern CSS, JS)
+│   ├── index.html
+│   ├── app.js
+│   └── style.css
+│
+├── models/                     # Trọng số mô hình AI
+│   ├── draem.pth               # Trọng số mô hình DRAEM chính thức
+│   └── weights.pt              # Trọng số mô hình YOLOv8 phát hiện lon
+│
+├── esp_firmware/               # Mã nguồn nạp vi điều khiển ESP8266
+│   ├── test1/test1.ino         # Firmware chính thức (MG996R, delay gạt 900ms)
+│   ├── test1_backup2/          # Bản sao lưu firmware 2
+│   └── test1_backup3/          # Bản sao lưu firmware 3
+│
+├── dataset/                    # Dữ liệu ảnh gốc thu thập từ camera
+│   ├── train_ok/               # Mẫu lon đạt chuẩn
+│   └── test_ng/                # Mẫu lon lỗi thực tế
+│
+├── dataset_labeled/            # Dữ liệu đã qua cắt viền và tăng cường sẵn sàng train
+│
+├── notebooks/                  # Jupyter Notebooks huấn luyện mô hình
+│   ├── Draem_T11.ipynb         # Notebook huấn luyện DRAEM trên Google Colab / GPU
+│   └── Draem_T11_2500.ipynb    # Checkpoint thực nghiệm huấn luyện 2500 epochs
+│
+├── captures/                   # Ảnh chụp kiểm tra thực tế trong quá trình vận hành
+├── results/                    # Cơ sở dữ liệu SQLite (inspection_database.db) và báo cáo CSV
+├── report_images/              # Biểu đồ và hình ảnh trực quan phục vụ báo cáo khoa học
+│   └── calibration/            # Ảnh hiệu chuẩn bán kính cắt và độ sáng
+└── docs/                       # Tài liệu kỹ thuật chi tiết
 ```
 
-Vite chạy ở `http://localhost:5173` và proxy API về `http://127.0.0.1:5004`. Muốn trỏ sang API khác, tạo `frontend/.env.local` từ `.env.example` và đặt `VITE_API_BASE_URL`.
+---
 
-Build để deploy static riêng:
+## 3. Hướng dẫn Vận hành
 
+### Bước 1: Kích hoạt môi trường và cài đặt thư viện
 ```bash
-cd frontend
-npm run build
+pip install -r requirements.txt
 ```
 
-Deploy thư mục `frontend/dist` lên static host. Backend cần cho phép origin của frontend qua `FRONTEND_ORIGINS` và chạy bằng:
+### Bước 2: Cấu hình thông số
+Kiểm tra file `config.yaml` để đảm bảo:
+- `camera.rtsp_url`: Đúng đường dẫn RTSP của camera.
+- `esp.ip`: Địa chỉ IP của ESP8266 trên mạng nội bộ.
+- `draem.threshold`: Ngưỡng quyết định lon NG (khuyến nghị 0.25).
 
+### Bước 3: Khởi động hệ thống
 ```bash
-uvicorn backend_asgi:app --host 0.0.0.0 --port 5004
+python main.py
 ```
 
-Hướng dẫn chi tiết chạy backend trực tiếp, Docker Compose và deploy frontend lên Netlify: [`DEPLOYMENT.md`](DEPLOYMENT.md).
-
-## Nhánh thuật toán
-
-- `algorithm/draem`: tích hợp adapter và checkpoint DRAEM sau khi huấn luyện.
-- `algorithm/sk-rd4ad`: tích hợp adapter và checkpoint SK-RD4AD sau khi huấn luyện.
-
-Hiện hai nhánh là nền tảng chung; chưa chứa checkpoint đã train. Xem `docs/ANOMALY_MODELS_INTEGRATION.md` trước khi thêm weights. Không commit dataset, `.env`, credentials hoặc model weights trực tiếp nếu chưa chọn Git LFS/model registry.
+### Bước 4: Mở Dashboard
+Truy cập trình duyệt: `http://localhost:5004`
+- Theo dõi luồng camera trực tiếp và trạng thái lon (GOOD / NG).
+- Xem ảnh Heatmap phân tích vùng lỗi.
+- Theo dõi thống kê tổng sản lượng, tỷ lệ đạt/lỗi và xuất báo cáo.

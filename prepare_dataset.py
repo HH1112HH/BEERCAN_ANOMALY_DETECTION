@@ -233,7 +233,7 @@ def main():
         with open(test_lbl_dir / fname.replace(".jpg", ".txt"), "w") as f:
             f.write("0 0.5 0.5 1.0 1.0\n")
 
-    # 4. Đóng gói ZIP (dataset_labeled.zip & data_labeled.zip)
+    # 4. Đóng gói ZIP (dataset_labeled.zip)
     zip_path = Path("dataset_labeled.zip")
     if zip_path.exists():
         zip_path.unlink()
@@ -247,9 +247,6 @@ def main():
                 zf.write(full_path, rel_path)
 
     zip_size_mb = zip_path.stat().st_size / (1024 * 1024)
-
-    # Đồng bộ sang data_labeled.zip để tương thích mọi phiên bản notebook
-    shutil.copyfile(zip_path, "data_labeled.zip")
 
     print("\n" + "=" * 70)
     print(f" [OK] HOÀN TẤT THÀNH CÔNG!")

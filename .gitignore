@@ -8,20 +8,9 @@ dataset/
 dataset_labeled/
 *.zip
 *.diff
-compare_*.jpg
-tight_*.jpg
-test_*.jpg
-snug_fit_preview.jpg
-sub_test.jpg
-preview_cropped_samples.jpg
+report_images/calibration/
 __pycache__/
 *.py[cod]
-
-frontend/node_modules/
-frontend/dist/
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
 
 .env
 .env.*
