@@ -26,8 +26,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 os.chdir(ROOT_DIR)
 
-from camera_service import CameraService, CameraConfig
-from conveyor_controller import ConveyorController
+from src.camera_service import CameraService, CameraConfig
+from src.conveyor_controller import ConveyorController
 
 logging.basicConfig(
     level=logging.INFO,

@@ -19,15 +19,15 @@ SRC_DIR = Path(__file__).resolve().parent / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from camera_service import CameraService, CameraConfig
-from detector import YOLODetector
-from classifier import Classifier
-from conveyor_controller import ConveyorController
-import db_manager as db
-import image_logger
+from src.camera_service import CameraService, CameraConfig
+from src.detector import YOLODetector
+from src.classifier import Classifier
+from src.conveyor_controller import ConveyorController
+import src.db_manager as db
+import src.image_logger as image_logger
 
 # Anomaly models
-from draem_model import DRAEM
+from src.draem_model import DRAEM
 
 
 class _NoConveyor:
