@@ -18,13 +18,10 @@ import argparse
 from pathlib import Path
 
 # Setup project root and src in sys.path
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent
 SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-os.chdir(ROOT_DIR)
 
 from src.camera_service import CameraService, CameraConfig
 from src.conveyor_controller import ConveyorController

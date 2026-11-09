@@ -18,7 +18,7 @@ if sys.platform == "win32":
         pass
 
 # Ensure working directory is project root
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent
 os.chdir(ROOT_DIR)
 
 

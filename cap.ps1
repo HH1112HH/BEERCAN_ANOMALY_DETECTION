@@ -2,4 +2,4 @@ param(
     [Parameter(ValueFromRemainingArguments = $true)]
     $Args
 )
-python tools/cap.py $Args
+python cap.py $Args

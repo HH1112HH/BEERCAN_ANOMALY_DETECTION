@@ -14,19 +14,21 @@ Hệ thống kiểm tra lỗi bề mặt đáy lon bia tự động ứng dụng
 
 ---
 
-## 2. Cấu trúc Thư mục Chuẩn (Modular Architecture)
+## 2. Cấu trúc Dự án
 
 ```text
 d:\bc_moi\
-├── main.py                     # Entry point duy nhất khởi động toàn bộ hệ thống
+├── main.py                     # Khởi động hệ thống kiểm tra chính (FastAPI + WebSocket + Pipeline)
+├── cap.py                      # Công cụ chụp ảnh thu thập mẫu từ camera
+├── cap.bat / cap.ps1           # Phím tắt chạy nhanh công cụ chụp ảnh: .\cap.bat [ok|ng]
+├── prepare_dataset.py          # Tiền xử lý và tăng cường dữ liệu huấn luyện DRAEM
 ├── config.yaml                 # File cấu hình toàn bộ hệ thống (Camera, Model, ESP, Server)
 ├── requirements.txt            # Danh sách thư viện Python cần thiết
-├── cap.bat / cap.ps1           # Phím tắt chạy nhanh công cụ chụp ảnh thu thập mẫu
 ├── dataset_labeled.zip         # File nén dataset sẵn sàng upload Colab
 ├── HUONG_DAN_CHAY.md           # Hướng dẫn chạy nhanh hệ thống
 ├── README.md                   # Tài liệu tổng quan dự án
 │
-├── src/                        # Các module dịch vụ lõi của hệ thống kiểm tra
+├── src/                        # Thư mục mã nguồn các module dịch vụ lõi
 │   ├── __init__.py
 │   ├── camera_service.py       # Quản lý luồng video RTSP từ camera công nghiệp / webcam
 │   ├── detector.py             # Nhận diện vị trí lon và cắt tròn ôm sát bằng YOLOv8
@@ -35,11 +37,6 @@ d:\bc_moi\
 │   ├── conveyor_controller.py  # Module giao tiếp HTTP/Serial với ESP8266
 │   ├── db_manager.py           # Quản lý cơ sở dữ liệu SQLite lưu trữ lịch sử kiểm tra
 │   └── image_logger.py         # Lưu trữ hình ảnh chụp lon, ROI và Heatmap
-│
-├── tools/                      # Công cụ phụ trợ thu thập và chuẩn bị dữ liệu
-│   ├── cap.py                  # Script chụp ảnh mẫu từ camera (thu thập dataset)
-│   ├── cap.bat / cap.ps1       # File thực thi chụp ảnh trong thư mục tools
-│   └── prepare_dataset.py      # Tiền xử lý và tăng cường dữ liệu huấn luyện
 │
 ├── static/                     # Giao diện Web Dashboard (HTML5, Modern CSS, JS)
 │   ├── index.html
@@ -87,7 +84,7 @@ Kiểm tra file `config.yaml` để đảm bảo:
 - `esp.ip`: Địa chỉ IP của ESP8266 trên mạng nội bộ.
 - `draem.threshold`: Ngưỡng quyết định lon NG (khuyến nghị 0.25).
 
-### Bước 3: Khởi động hệ thống
+### Bước 3: Khởi động hệ thống kiểm tra
 ```bash
 python main.py
 ```
@@ -104,10 +101,10 @@ Truy cập trình duyệt: `http://localhost:5004`
 
 - **Chụp ảnh thu thập mẫu:**
   ```bash
-  .\cap.bat        # Chụp mẫu lon OK lưu vào dataset/train_ok
-  .\cap.bat ng     # Chụp mẫu lon lỗi lưu vào dataset/test_ng
+  python cap.py        # Chụp lon OK (hoặc gõ .\cap.bat)
+  python cap.py ng     # Chụp lon NG (hoặc gõ .\cap.bat ng)
   ```
 - **Tiền xử lý & Tăng cường dữ liệu:**
   ```bash
-  python tools/prepare_dataset.py
+  python prepare_dataset.py
   ```
