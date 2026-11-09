@@ -1,6 +1,6 @@
-# 🧠 DRAEM MODEL INTEGRATION & INFERENCE SPECIFICATION
+# DRAEM MODEL INTEGRATION & INFERENCE SPECIFICATION
 
-Tài liệu kỹ thuật đặc tả việc tích hợp mô hình học sâu **DRAEM (Discriminative Reconstructive Anomaly Embedding)** vào pipeline kiểm tra thời gian thực trong [`src/draem_model.py`](../src/draem_model.py).
+Tài liệu kỹ thuật đặc tả việc tích hợp mô hình học sâu DRAEM (Discriminative Reconstructive Anomaly Embedding) vào pipeline kiểm tra thời gian thực trong [`src/draem_model.py`](../src/draem_model.py).
 
 ---
 

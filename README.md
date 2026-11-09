@@ -1,4 +1,4 @@
-# 🍺 BeerCan DRAEM - Automated Visual Inspection System
+# BeerCan DRAEM - Automated Visual Inspection System
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch CUDA](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
@@ -6,14 +6,14 @@
 [![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-00FFFF)](https://github.com/ultralytics/ultralytics)
 [![ESP8266](https://img.shields.io/badge/Hardware-ESP8266%20%7C%20MG996R-E7352C)](https://www.espressif.com/)
 
-Hệ thống kiểm tra lỗi bề mặt đáy lon bia tự động ứng dụng Trí tuệ Nhân tạo (**Computer Vision & Deep Learning - DRAEM**) kết hợp băng chuyền công nghiệp và cơ cấu gạt phân loại lon lỗi sử dụng vi điều khiển **ESP8266** và động cơ Servo kim loại **MG996R**.
+Hệ thống kiểm tra lỗi bề mặt đáy lon bia tự động ứng dụng Trí tuệ Nhân tạo (Computer Vision & Deep Learning - DRAEM) kết hợp băng chuyền công nghiệp và cơ cấu gạt phân loại lon lỗi sử dụng vi điều khiển ESP8266 và động cơ Servo kim loại MG996R.
 
 ---
 
-## 📌 Tính Năng Nổi Bật
+## 1. Tính Năng Nổi Bật
 
 - **Định vị & Cắt tròn ôm sát 100% (Snug Circular Crop):** Sử dụng YOLOv8 phát hiện tọa độ lon theo thời gian thực và thuật toán Hough Circle Gradient che phủ viền đen, triệt tiêu hoàn toàn nhiễu từ thành băng chuyền.
-- **Phát hiện bất thường với DRAEM:** Mô hình tự giám sát (Reconstructive + Discriminative Sub-networks) phát hiện chính xác các vết trầy xước, móp méo, dị vật, vết bẩn ở đáy lon và sinh ảnh **Heatmap** trực quan hóa vùng lỗi.
+- **Phát hiện bất thường với DRAEM:** Mô hình tự giám sát (Reconstructive + Discriminative Sub-networks) phát hiện chính xác các vết trầy xước, móp méo, dị vật, vết bẩn ở đáy lon và sinh ảnh Heatmap trực quan hóa vùng lỗi.
 - **Phân loại & Ra quyết định tự động:** So sánh điểm số bất thường (Anomaly Score) với ngưỡng chuẩn (`threshold = 0.25`) để phân định tức thời `GOOD` hoặc `NG`.
 - **Cơ cấu gạt phân loại MG996R tối ưu:** ESP8266 điều khiển Servo MG996R (nhông kim loại) với thuật toán di chuyển 2 giai đoạn (Snappy Stroke) và độ trễ hành trình lon được hiệu chuẩn chính xác `900ms`.
 - **Web Dashboard thời gian thực:** Giao diện điều khiển trực quan tại cổng `5004`, truyền luồng video camera trực tiếp, hiển thị kết quả kiểm tra, ảnh Heatmap, đếm sản lượng và quản lý phiên kiểm tra.
@@ -21,10 +21,10 @@ Hệ thống kiểm tra lỗi bề mặt đáy lon bia tự động ứng dụng
 
 ---
 
-## 🏗️ Kiến Trúc Hệ Thống
+## 2. Kiến Trúc Hệ Thống
 
 ```
- [ Camera IP Dahua RTSP ]
+ [ Camera IP Imou RTSP ]
             │
             ▼ (Luồng video 1280x720)
 ┌─────────────────────────────────────────────────────────────┐
@@ -50,7 +50,7 @@ Hệ thống kiểm tra lỗi bề mặt đáy lon bia tự động ứng dụng
 
 ---
 
-## 📁 Cấu Trúc Thư Mục
+## 3. Cấu Trúc Thư Mục
 
 Dự án được tổ chức theo chuẩn kiến trúc module phân lớp sạch sẽ:
 
@@ -110,7 +110,7 @@ d:\bc_moi\
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Chạy Nhanh
+## 4. Hướng Dẫn Cài Đặt & Chạy Nhanh
 
 ### 1. Yêu Cầu Môi Trường
 - **Hệ điều hành:** Windows 10/11 hoặc Linux.
@@ -159,7 +159,7 @@ Mở trình duyệt Web tại: **`http://localhost:5004`**
 
 ---
 
-## 🛠️ Công Cụ Thu Thập & Huấn Luyện Dữ Liệu
+## 5. Công Cụ Thu Thập & Huấn Luyện Dữ Liệu
 
 1. **Chụp ảnh thu thập mẫu từ Camera:**
    ```bash
@@ -183,8 +183,8 @@ Mở trình duyệt Web tại: **`http://localhost:5004`**
 
 ---
 
-## 📖 Tài Liệu Tham Khảo Thêm
+## 6. Tài Liệu Tham Khảo Thêm
 
-- [📘 Hướng dẫn vận hành chi tiết (HUONG_DAN_CHAY.md)](HUONG_DAN_CHAY.md)
-- [🔬 Kiến trúc AI & Pipeline xử lý ảnh chi tiết (docs/KIEN_TRUC_HE_THONG.md)](docs/KIEN_TRUC_HE_THONG.md)
-- [🔌 Sơ đồ đấu nối phần cứng & Hiệu chuẩn ESP8266 / MG996R (docs/PHAN_CUNG_ESP8266.md)](docs/PHAN_CUNG_ESP8266.md)
+- [Hướng dẫn vận hành chi tiết (HUONG_DAN_CHAY.md)](HUONG_DAN_CHAY.md)
+- [Kiến trúc AI & Pipeline xử lý ảnh chi tiết (docs/KIEN_TRUC_HE_THONG.md)](docs/KIEN_TRUC_HE_THONG.md)
+- [Sơ đồ đấu nối phần cứng & Hiệu chuẩn ESP8266 / MG996R (docs/PHAN_CUNG_ESP8266.md)](docs/PHAN_CUNG_ESP8266.md)

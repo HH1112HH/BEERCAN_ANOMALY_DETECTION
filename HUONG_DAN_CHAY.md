@@ -1,4 +1,4 @@
-# 📖 CẨM NANG HƯỚNG DẪN VẬN HÀNH HỆ THỐNG KIỂM TRA ĐÁY LON BIA
+# CẨM NANG HƯỚNG DẪN VẬN HÀNH HỆ THỐNG KIỂM TRA ĐÁY LON BIA
 
 Tài liệu này cung cấp quy trình vận hành chi tiết từ A - Z cho toàn bộ hệ thống kiểm tra lỗi đáy lon bia tự động bằng mô hình AI DRAEM kết hợp băng chuyền và bộ gạt Servo ESP8266.
 
@@ -19,8 +19,8 @@ Tài liệu này cung cấp quy trình vận hành chi tiết từ A - Z cho to�
 
 Trước khi bật nguồn máy tính và chạy phần mềm, hãy kiểm tra các kết nối vật lý:
 
-1. **Camera IP Dahua:**
-   - Cắm dây mạng LAN nối camera với router/switch chung dải mạng với máy tính.
+1. **Camera IP Imou:**
+   - Cắm dây mạng LAN nối camera với router/switch chung dải mạng với máy tính (hoặc kết nối WiFi ổn định).
    - Đèn hồng ngoại / đèn LED chiếu sáng đáy lon đã bật ổn định.
    - Vị trí camera chiếu thẳng góc 90 độ xuống đáy lon trên băng tải.
 2. **Bộ điều khiển ESP8266 NodeMCU & Servo MG996R:**
@@ -176,7 +176,7 @@ Nếu thay đổi vi điều khiển ESP8266 hoặc cần nạp lại code:
 
 | Tình trạng | Nguyên nhân có thể | Cách khắc phục |
 | :--- | :--- | :--- |
-| **Báo lỗi `Cannot connect to RTSP`** | - Camera chưa cắm nguồn hoặc lỏng cáp LAN.<br>- IP camera trong `config.yaml` bị sai. | - Dùng lệnh `ping 192.168.1.20` kiểm tra camera.<br>- Đảm bảo máy tính và camera cùng dải mạng. |
+| **Báo lỗi `Cannot connect to RTSP`** | - Camera chưa cắm nguồn hoặc lỏng cáp LAN / mất WiFi.<br>- IP camera trong `config.yaml` bị sai. | - Dùng lệnh `ping 192.168.1.20` kiểm tra camera.<br>- Đảm bảo máy tính và camera cùng dải mạng. |
 | **Báo lỗi `ESP not connected`** | - ESP8266 chưa kết nối WiFi.<br>- IP của ESP8266 bị router cấp mới. | - Mở Serial Monitor (baud 115200) của Arduino IDE để xem IP mới của ESP8266.<br>- Cập nhật IP mới vào mục `esp.ip` trong `config.yaml`. |
 | **Servo không gạt lon lỗi** | - Lỏng dây tín hiệu D5.<br>- Nguồn 5V cho Servo bị yếu dòng. | - Cấp nguồn 5V/2A riêng cho Servo MG996R.<br>- Nhớ nối chung dây GND của nguồn Servo với chân GND của ESP8266. |
 | **Servo gạt bị sớm hoặc trễ hơn lon** | Tốc độ băng chuyền thay đổi khiến thời gian lon di chuyển từ camera đến tay gạt lệch 900ms. | Chỉnh lại thông số `#define NG_EJECT_DELAY_MS` trong file `esp_firmware/test1/test1.ino` (tăng lên nếu gạt sớm, giảm đi nếu gạt trễ). |
@@ -185,4 +185,4 @@ Nếu thay đổi vi điều khiển ESP8266 hoặc cần nạp lại code:
 
 ---
 
-> *Nếu cần dừng toàn bộ hệ thống đang chạy trong Terminal: Nhấn tổ hợp phím **Ctrl + C**.*
+*Nếu cần dừng toàn bộ hệ thống đang chạy trong Terminal: Nhấn tổ hợp phím **Ctrl + C**.*

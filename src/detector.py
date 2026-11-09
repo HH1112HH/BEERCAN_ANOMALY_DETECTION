@@ -15,7 +15,7 @@ class YOLODetector:
         self.max_det = max_det
         self.imgsz = imgsz
 
-        # Tọa độ vùng trạm kiểm tra trên khung hình Dahua (1296 x 2304)
+        # Tọa độ vùng trạm kiểm tra trên khung hình Imou (1296 x 2304)
         self.station_cx = 1000
         self.station_cy = 520
         self.zone_x1 = 500
@@ -76,7 +76,7 @@ class YOLODetector:
 
             # Lon thật phải có:
             # 1. Độ tin cậy YOLO cao (conf >= 0.68 - lon thật luôn >= 0.85, bóng băng tải chỉ 0.50-0.62)
-            # 2. Kích thước chuẩn trên khung hình Dahua (bw, bh >= 420 px - lon thật là 700-800px)
+            # 2. Kích thước chuẩn trên khung hình Imou (bw, bh >= 420 px - lon thật là 700-800px)
             # 3. Nằm trong vùng trạm kiểm tra của băng chuyền (bỏ qua viền camera)
             if conf >= 0.68 and bw >= 420 and bh >= 420 and (350 <= bcx <= fw - 350) and (120 <= bcy <= fh - 120):
                 dist = np.hypot(bcx - (fw // 2), bcy - (fh // 2))
@@ -116,7 +116,7 @@ class YOLODetector:
             else:
                 true_cx = cx
                 true_cy = cy
-                can_r = 358  # Bán kính chuẩn vành nhôm trên camera Dahua 1296x2304
+                can_r = 358  # Bán kính chuẩn vành nhôm trên camera Imou 1296x2304
 
             # Cắt vuông chuẩn tâm khớp 100% tỷ lệ huấn luyện của DRAEM (R_box = can_r + 4)
             R_box = can_r + 4

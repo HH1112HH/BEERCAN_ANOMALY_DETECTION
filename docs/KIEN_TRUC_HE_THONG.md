@@ -1,6 +1,6 @@
-# 🔬 BÁO CÁO KỸ THUẬT: KIẾN TRÚC HỆ THỐNG & MÔ HÌNH AI DRAEM
+# BÁO CÁO KỸ THUẬT: KIẾN TRÚC HỆ THỐNG & MÔ HÌNH AI DRAEM
 
-Tài liệu mô tả chi tiết kiến trúc phần mềm, thuật toán thị giác máy tính và mạng nơ-ron học sâu phát hiện dị tật đáy lon bia (**DRAEM - Discriminative Reconstructive Anomaly Embedding**).
+Tài liệu mô tả chi tiết kiến trúc phần mềm, thuật toán thị giác máy tính và mạng nơ-ron học sâu phát hiện dị tật đáy lon bia (DRAEM - Discriminative Reconstructive Anomaly Embedding).
 
 ---
 
@@ -10,7 +10,7 @@ Hệ thống hoạt động theo chu trình khép kín thời gian thực:
 
 ```mermaid
 flowchart TD
-    A["Camera IP Dahua (RTSP Stream 1280x720)"] --> B["CameraService (Threaded Frame Buffer)"]
+    A["Camera IP Imou (RTSP Stream 1280x720)"] --> B["CameraService (Threaded Frame Buffer)"]
     B --> C["CanDetector (YOLOv8 Object Detection)"]
     C --> D["Snug Circular Crop (Hough Circle + Mask Nền Đen)"]
     D --> E["DRAEM AI Model (Kích thước 256x256)"]
@@ -56,11 +56,11 @@ DRAEM là mô hình học không giám sát (Unsupervised / Self-Supervised Anom
 - **Kiến trúc:** Autoencoder dựa trên kiến trúc U-Net sâu với các kết nối tắt (Skip Connections).
 - **Nhiệm vụ:** Nhận ảnh đầu vào (dù có khuyết tật hay không) và tái tạo lại hình ảnh đáy lon nhôm ở trạng thái hoàn hảo, không có lỗi.
 - **Cơ chế huấn luyện:**
-  - Trong quá trình train, mô hình chỉ học trên tập ảnh lon đạt chuẩn (**OK**).
-  - Thuật toán tự động sinh dị tật nhân tạo (Synthetic Anomalies) bằng **Perlin Noise** kết hợp trộn cấu trúc bề mặt ngẫu nhiên.
+  - Trong quá trình train, mô hình chỉ học trên tập ảnh lon đạt chuẩn (OK).
+  - Thuật toán tự động sinh dị tật nhân tạo (Synthetic Anomalies) bằng Perlin Noise kết hợp trộn cấu trúc bề mặt ngẫu nhiên.
   - Hàm mất mát tái tạo:
     $$\mathcal{L}_{recon} = \mathcal{L}_{L2}(I_{recon}, I_{clean}) + \mathcal{L}_{SSIM}(I_{recon}, I_{clean})$$
-    *(Kết hợp giữa sai số bình phương trung bình $L2$ và chỉ số tương đồng cấu trúc $SSIM$).*
+    (Kết hợp giữa sai số bình phương trung bình $L2$ và chỉ số tương đồng cấu trúc $SSIM$).
 
 ### 3.2. Discriminative Sub-network (Mạng phân biệt)
 - **Kiến trúc:** Mạng phân đoạn U-Net nhận đầu vào là ảnh ghép nối (Concatenation) 6 kênh gồm:
@@ -69,7 +69,7 @@ DRAEM là mô hình học không giám sát (Unsupervised / Self-Supervised Anom
 - **Nhiệm vụ:** So sánh sự sai lệch giữa ảnh thực tế và ảnh tái tạo lý tưởng, từ đó xuất ra bản đồ xác suất bất thường kích thước $256 \times 256$ với từng pixel mang giá trị từ $0.0$ đến $1.0$.
 - **Hàm mất mát phân đoạn:**
   $$\mathcal{L}_{seg} = \mathcal{L}_{Focal}(M_{pred}, M_{gt})$$
-  *(Sử dụng Focal Loss để tập trung tối đa vào các chi tiết lỗi nhỏ, mất cân bằng điểm ảnh).*
+  (Sử dụng Focal Loss để tập trung tối đa vào các chi tiết lỗi nhỏ, mất cân bằng điểm ảnh).
 
 ---
 
@@ -77,7 +77,7 @@ DRAEM là mô hình học không giám sát (Unsupervised / Self-Supervised Anom
 
 Từ bản đồ xác suất bất thường $M_{pred} \in [0, 1]^{256 \times 256}$:
 1. Áp dụng bộ lọc trung bình động làm mịn bản đồ nhiệt.
-2. Lấy trung bình của **Top $K$ phần tử có điểm số cao nhất** (vùng tập trung bất thường lớn nhất):
+2. Lấy trung bình của Top $K$ phần tử có điểm số cao nhất (vùng tập trung bất thường lớn nhất):
    $$\text{Score} = \frac{1}{K} \sum_{i=1}^{K} M_{sorted}[i]$$
 3. **Quy tắc phân loại:**
    - Nếu $\text{Score} < 0.25 \implies \text{Kết quả: } \mathbf{GOOD}$ (Đạt chuẩn).
@@ -87,7 +87,7 @@ Từ bản đồ xác suất bất thường $M_{pred} \in [0, 1]^{256 \times 25
 
 ## 5. THỰC THI THỜI GIAN THỰC & ĐỘ TRỄ (BENCHMARK)
 
-Kiểm thử trên phần cứng: **NVIDIA GPU CUDA, Camera Dahua 30 FPS**:
+Kiểm thử trên phần cứng: **NVIDIA GPU CUDA, Camera Imou 30 FPS**:
 
 | Giai đoạn xử lý | Thời gian trung bình |
 | :--- | :--- |
@@ -98,4 +98,4 @@ Kiểm thử trên phần cứng: **NVIDIA GPU CUDA, Camera Dahua 30 FPS**:
 | Ghi log SQLite & Lưu ảnh bất đồng bộ | ~2 ms |
 | **TỔNG THỜI GIAN XỬ LÝ 1 LON** | **~29 ms** ($\approx 34$ lon/giây) |
 
-👉 Tốc độ xử lý hoàn toàn vượt trội so với tốc độ di chuyển của băng chuyền thực tế (~1 - 2 lon/giây), đảm bảo không bao giờ bị nghẽn luồng hay trễ nhịp phân loại.
+Tốc độ xử lý hoàn toàn vượt trội so với tốc độ di chuyển của băng chuyền thực tế (~1 - 2 lon/giây), đảm bảo không bao giờ bị nghẽn luồng hay trễ nhịp phân loại.

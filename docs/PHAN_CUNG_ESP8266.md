@@ -1,12 +1,12 @@
-# 🔌 TÀI LIỆU KỸ THUẬT: PHẦN CỨNG ESP8266 & CƠ CẤU GẠT SERVO MG996R
+# TÀI LIỆU KỸ THUẬT: PHẦN CỨNG ESP8266 & CƠ CẤU GẠT SERVO MG996R
 
-Tài liệu hướng dẫn sơ đồ chân, nguyên lý cấp nguồn và thuật toán điều khiển động cơ Servo kim loại **MG996R** kết nối với vi điều khiển **ESP8266 NodeMCU** phục vụ phân loại lon lỗi trên băng tải.
+Tài liệu hướng dẫn sơ đồ chân, nguyên lý cấp nguồn và thuật toán điều khiển động cơ Servo kim loại MG996R kết nối với vi điều khiển ESP8266 NodeMCU phục vụ phân loại lon lỗi trên băng tải.
 
 ---
 
 ## 1. SO SÁNH PHẦN CỨNG: SERVO MG996R VS SG90
 
-Trong các phiên bản thử nghiệm ban đầu, động cơ **SG90** (nhông nhựa) thường xuyên gặp các vấn đề:
+Trong các phiên bản thử nghiệm ban đầu, động cơ SG90 (nhông nhựa) thường xuyên gặp các vấn đề:
 - Lực kéo yếu ($1.8 \text{ kg}\cdot\text{cm}$), dễ bị kẹt khi gạt lon bia nặng.
 - Dễ gãy bánh răng nhựa sau nhiều chu kỳ đập liên tục.
 - Hành trình đập bị rung lắc, dễ trượt bước.
@@ -39,7 +39,7 @@ Trong các phiên bản thử nghiệm ban đầu, động cơ **SG90** (nhông 
 
 ## 3. THUẬT TOÁN ĐIỀU KHIỂN & HIỆU CHUẨN THỜI GIAN
 
-Hành trình gạt lon NG được thiết kế theo thuật toán **Snappy Stroke (Đập dứt khoát 2 giai đoạn)** để đảm bảo gạt văng lon lỗi ra khỏi băng tải mà không cản trở lon đi ngay sau:
+Hành trình gạt lon NG được thiết kế theo thuật toán Snappy Stroke (Đập dứt khoát 2 giai đoạn) để đảm bảo gạt văng lon lỗi ra khỏi băng tải mà không cản trở lon đi ngay sau:
 
 ```
 T0: Nhận lệnh "NG" từ Backend Python
