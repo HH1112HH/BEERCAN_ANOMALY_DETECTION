@@ -4,16 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Industrial Defect Detection System</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=105">
 </head>
 <body>
   <header>
-    <h1>Industrial Defect Detection System</h1>
+    <div class="brand">
+      <h1>Industrial Defect Detection System</h1>
+      <span class="status-indicator live">Vision Online</span>
+    </div>
     <div class="header-controls">
-      <div class="tabs">
-        <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
-        <button class="tab" onclick="switchTab('settings')">Settings</button>
-      </div>
+      <button class="btn btn-outline btn-sm" onclick="createNewSession()">Đợt Test Mới</button>
+      <a class="btn btn-outline btn-sm" href="/session/export" target="_blank" download style="text-decoration:none;">Xuất CSV</a>
       <button class="btn btn-outline btn-sm" onclick="resetCounters()">Reset</button>
     </div>
   </header>
@@ -22,8 +23,11 @@
     <!-- Video Section -->
     <div class="video-section">
       <div class="video-header">
-        <h2>📷 Live Camera Feed</h2>
-        <span id="fps-display" style="font-size:13px;color:#38bdf8;font-weight:600;">0 FPS</span>
+        <div class="video-title-wrap">
+          <h2>Live Camera Feed</h2>
+          <span id="ai-mode-badge" class="mode-badge active">AI Inspection Active</span>
+        </div>
+        <span id="fps-display" class="fps-badge">0 FPS</span>
       </div>
       <div class="stream-container">
         <img id="video-stream" src="/video" alt="Live Stream">
@@ -31,8 +35,20 @@
       </div>
     </div>
 
-    <!-- Stats Panel -->
+    <!-- Stats & Control Panel -->
     <div class="stats-panel">
+      <!-- Session Banner -->
+      <div class="session-banner">
+        <div class="session-info">
+          <span class="session-tag">Phiên Kiểm Tra Hiện Tại</span>
+          <strong id="session-name">Đang nạp...</strong>
+        </div>
+        <div class="session-badge">
+          <span id="session-count">0</span> / <span id="session-target">100</span> lon
+        </div>
+      </div>
+
+      <!-- 4 Stats Cards -->
       <div class="stats-grid">
         <div class="stat-card good">
           <div class="label">Good</div>
@@ -52,46 +68,59 @@
         </div>
       </div>
 
+      <!-- Quality Rate Bar -->
       <div class="rate-bar">
         <div class="label-bar">
           <span>Quality Rate</span>
-          <span id="rate-text">0%</span>
+          <span id="rate-text">100%</span>
         </div>
         <div class="bar">
-          <div class="bar-fill good" id="rate-bar" style="width:0%"></div>
+          <div class="bar-fill good" id="rate-bar" style="width:100%"></div>
         </div>
       </div>
 
-      <div class="conveyor-status">
-        <span class="label">🔄 Conveyor Belt</span>
-        <span class="value" id="conveyor-status">---</span>
-      </div>
-
-      <!-- Controls -->
-      <div class="controls" id="tab-dashboard">
+      <!-- 1. Conveyor Belt Control -->
+      <div class="control-card">
+        <div class="control-card-header">
+          <span class="control-title">Băng Tải (Conveyor)</span>
+          <span class="status-pill" id="conveyor-status">---</span>
+        </div>
         <div class="control-row">
-          <button class="btn btn-primary" onclick="startSystem()">▶ Start</button>
-          <button class="btn btn-danger" onclick="stopSystem()">⏹ Stop</button>
-        </div>
-        <div class="slider-row">
-          <label>DRAEM Threshold (Ngưỡng lỗi)</label>
-          <input type="range" id="draem-slider" min="0.10" max="0.95" step="0.01" value="0.50" oninput="updateThreshold('draem', this.value)">
-          <span class="slider-value" id="draem-value">0.50</span>
-        </div>
-        <div class="slider-row">
-          <label>YOLO Confidence</label>
-          <input type="range" id="conf-slider" min="0.20" max="0.99" step="0.01" value="0.45" oninput="updateThreshold('conf', this.value)">
-          <span class="slider-value" id="conf-value">0.45</span>
+          <button id="btn-conveyor-start" class="btn btn-outline-success" type="button" onclick="startConveyor()">Chạy Băng Tải</button>
+          <button id="btn-conveyor-stop" class="btn btn-outline-danger" type="button" onclick="stopConveyor()">Dừng Băng Tải</button>
         </div>
       </div>
 
-      <div class="controls" id="tab-settings" style="display:none;">
-        <div style="margin-top:12px;font-size:12px;color:#64748b;">
-          <p><strong>Model:</strong> DRAEM (Recon + Discr UNet)</p>
-          <p><strong>Colab Suggested:</strong> 0.174</p>
-          <p><strong>ESP IP:</strong> <span id="esp-ip">192.168.1.37:12345</span></p>
-          <p><strong>Camera RTSP:</strong> 192.168.1.20:554</p>
-          <p><strong>Status:</strong> <span id="sys-status">Running</span></p>
+      <!-- 2. AI Inspection Control -->
+      <div class="control-card">
+        <div class="control-card-header">
+          <span class="control-title">Phân Tích AI & Gạt Lon</span>
+          <span class="status-pill" id="ai-status">---</span>
+        </div>
+        <div class="control-row">
+          <button id="btn-ai-start" class="btn btn-outline-primary" type="button" onclick="startAI()">Bật Phân Tích</button>
+          <button id="btn-ai-stop" class="btn btn-outline-warning" type="button" onclick="stopAI()">Dừng Phân Tích</button>
+        </div>
+      </div>
+
+      <!-- 3. Algorithm Thresholds -->
+      <div class="control-card">
+        <div class="control-card-header">
+          <span class="control-title">Ngưỡng Thuật Toán</span>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header">
+            <label for="draem-slider">DRAEM Ngưỡng lỗi</label>
+            <span class="slider-value" id="draem-value">0.25</span>
+          </div>
+          <input type="range" id="draem-slider" min="0.10" max="0.95" step="0.01" value="0.25" oninput="updateThreshold('draem', this.value)">
+        </div>
+        <div class="slider-row">
+          <div class="slider-header">
+            <label for="conf-slider">YOLO Độ tin cậy</label>
+            <span class="slider-value" id="conf-value">0.45</span>
+          </div>
+          <input type="range" id="conf-slider" min="0.20" max="0.99" step="0.01" value="0.45" oninput="updateThreshold('conf', this.value)">
         </div>
       </div>
     </div>
@@ -99,8 +128,11 @@
     <!-- History -->
     <div class="history-section">
       <div class="history-header">
-        <h2>📋 Detection History</h2>
-        <span style="font-size:12px;color:#64748b;" id="history-count">0 records</span>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <h2>Detection History</h2>
+          <span id="history-count" class="history-count">0 records</span>
+        </div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="deleteLastRecord()">Xóa Lon Cuối (Undo)</button>
       </div>
       <div id="history-body">
         <div class="empty-state">No detections yet. Start the system to begin.</div>
@@ -110,6 +142,23 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="/static/app.js"></script>
+  <!-- Image Modal Dialog -->
+  <div id="image-modal" class="modal-overlay" onclick="closeImageModal()">
+    <div class="modal-dialog" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-title">Chi Tiết Phân Tích Khoa Học Lon #</h3>
+        <button class="modal-close-btn" onclick="closeImageModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <img id="modal-img" src="" alt="Ảnh phân tích chi tiết">
+      </div>
+      <div class="modal-footer">
+        <a id="modal-download-btn" class="btn btn-outline btn-sm" href="" download target="_blank">Tải Ảnh Về</a>
+        <button class="btn btn-solid-primary btn-sm" onclick="closeImageModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=105"></script>
 </body>
 </html>

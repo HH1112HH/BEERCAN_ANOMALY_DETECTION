@@ -59,3 +59,8 @@ class Classifier:
         self.product_count = 0
         self.good_count = 0
         self.ng_count = 0
+
+    def restore_counts(self, product_count, good_count, ng_count):
+        self.product_count = int(product_count)
+        self.good_count = int(good_count)
+        self.ng_count = int(ng_count)

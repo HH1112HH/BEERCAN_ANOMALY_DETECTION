@@ -21,7 +21,7 @@ server:
   host: 0.0.0.0
   port: 5004
 yolo:
-  confidence: 0.45
+  confidence: 0.65
   device: cuda:0
   half: true
   imgsz: 960

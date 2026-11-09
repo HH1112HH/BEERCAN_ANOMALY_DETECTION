@@ -27,6 +27,8 @@ unsigned long wifiRetryTimer = 0;
 
 // ====================== DRIVER STEP/PUL ======================
 volatile bool isRunning = false;
+bool manualStopped = false;
+bool aiEnabled = true;
 
 // ============================================================================
 // Y NGHIA QUY TRINH:
@@ -51,27 +53,28 @@ volatile bool isRunning = false;
 #define SERVO_FEED             180    // vi tri gat lon vao vi tri chup / chan lon
 #define SERVO_EJECT            180    // goc vung manh de danh vang lon NG
 
-// ==================== CẤU HÌNH CHẶN LON 2 GIAI ĐOẠN ====================
-// Giai đoạn 1: Vụt nhanh 0 -> 140 độ qua khoảng trống không chạm lon (300ms)
-// Giai đoạn 2: Đi siêu chậm 40 độ cuối (140 -> 180 độ) để êm ái ôm lon, KHÔNG HẤT LÙI LON (900ms)
-// Tổng thời gian chặn lon = 300ms + 900ms = 1200ms (1.2s - đúng chuẩn Bảng 9)
+// ==================== CẤU HÌNH CHẶN LON CHO MG996R ====================
+// MG996R lực rất mạnh (11 kg.cm) nên rút ngắn thời gian để servo gạt nhanh & dứt khoát:
+// Giai đoạn 1: Vụt nhanh 0 -> 140 độ qua khoảng trống không chạm lon (200ms)
+// Giai đoạn 2: Đi 40 độ cuối (140 -> 180 độ) để ôm lon vừa tới (250ms thay vì 900ms)
+// Tổng thời gian chặn lon = 200ms + 250ms = 450ms (nhanh gấp 3 lần code cũ!)
 #define FEED_FAST_ANGLE        140    // Goc quet nhanh qua khoang trong (do)
-#define FEED_FAST_TIME_MS      300    // Thoi gian quet nhanh 140 do dau (ms)
-#define FEED_SLOW_TIME_MS      900    // Thoi gian om cham 40 do cuoi (ms)
-#define SLOW_FEED_TIME_MS      (FEED_FAST_TIME_MS + FEED_SLOW_TIME_MS) // 1200ms
+#define FEED_FAST_TIME_MS      200    // Thoi gian quet nhanh 140 do dau (ms)
+#define FEED_SLOW_TIME_MS      250    // Thoi gian om 40 do cuoi (ms)
+#define SLOW_FEED_TIME_MS      (FEED_FAST_TIME_MS + FEED_SLOW_TIME_MS) // 450ms
 
-#define GATE_OPEN_SETTLE_MS    250    // thoi gian cho can gat rut han ve 0 (250ms) truoc khi bat bang chuyen
+#define GATE_OPEN_SETTLE_MS    200    // thoi gian cho can gat rut han ve 0 truoc khi bat bang chuyen
 #define SLOW_FEED_REFRESH      20     // cap nhat goc moi 20ms
 
-// ==================== ĐỊNH THỜI GẠT LON NG ====================
+// ==================== ĐỊNH THỜI GẠT LON NG (CHO MG996R) ====================
 // Thoi gian bang chuyen dua lon NG chay tiep sau khi duoi lon roi IR de toi dung tam can gat (ms)
-// (Mac dinh cu la 450ms, tang len 580ms de lon di sau hon vao tam don danh cua can gat)
-#define NG_EJECT_DELAY_MS      580    
+#define NG_EJECT_DELAY_MS      900  
 
 #define NG_PASS_TIMEOUT_MS     15000  // neu lon khong roi IR thi dung bang chuyen
 #define OK_PASS_TIMEOUT_MS     10000  // failsafe neu lon tot bi ket tren duong di
-#define STRIKE_HOLD_MS         250    // cho servo vung toi goc danh lon (ms)
-#define STRIKE_RETURN_MS       350    // thoi gian thu servo ve vi tri san sang (ms)
+// MG996R cần ~400-450ms để vung hết hành trình 180 độ va chạm lon NG:
+#define STRIKE_HOLD_MS         450    // cho servo vung toi goc danh lon (ms)
+#define STRIKE_RETURN_MS       400    // thoi gian thu servo ve vi tri san sang (ms)
 #define INSPECTION_FAILSAFE_MS 30000  // fallback neu PC mat ket noi
 
 Servo servo;
@@ -80,6 +83,9 @@ Servo servo;
 int servoPos = SERVO_HOME;
 
 void servoWrite(int angle) {
+  if (!servo.attached()) {
+    servo.attach(SERVO_PIN);
+  }
   servoPos = angle;
   servo.write(angle);
 }
@@ -160,6 +166,9 @@ unsigned long gatingTimer = 0;
 unsigned long lastDiagTime = 0;
 unsigned long lastWaitNotifyTime = 0;
 unsigned long irReleaseTimer = 0;
+unsigned long irBlockStartTime = 0;
+bool irMustClearFirst = false;
+#define IR_DEBOUNCE_MS  150   // Chống nhiễu quang học & mối nối đai: phải chắn liên tục >= 150ms mới kích hoạt
 unsigned long waitingStartTime = 0;
 unsigned long ngPassStartTime = 0;
 unsigned long okPassStartTime = 0;
@@ -245,6 +254,7 @@ void setState(int nextState) {
     case RUNNING:
       slowActive = false;
       servoWrite(SERVO_HOME);
+      irMustClearFirst = true;
       motorOn();
       sendMsg("STATE=RUNNING\n");
       break;
@@ -348,11 +358,29 @@ void handleCmd(String cmd) {
 
   // Lenh dieu khien tu Web hoac Serial
   if (upper == "START") {
+    manualStopped = false;
     setState(RUNNING);
     return;
   }
   if (upper == "STOP") {
+    manualStopped = true;
     motorOff();
+    sendMsg("STATE=STOPPED MANUAL_STOP\n");
+    return;
+  }
+  if (upper == "AI_ON") {
+    aiEnabled = true;
+    sendMsg("STATE=AI_ON\n");
+    return;
+  }
+  if (upper == "AI_OFF") {
+    aiEnabled = false;
+    slowActive = false;
+    servoWrite(SERVO_HOME);
+    if (state == WAITING || state == FEEDING) {
+      setState(RUNNING);
+    }
+    sendMsg("STATE=AI_OFF\n");
     return;
   }
 
@@ -363,6 +391,20 @@ void handleCmd(String cmd) {
     slowActive = false;
     servoWrite(SERVO_HOME);
     sendMsg("SERVO_HOME\n");
+    return;
+  }
+  if (upper.startsWith("SERVO ")) {
+    int targetA = upper.substring(6).toInt();
+    targetA = constrain(targetA, 0, 180);
+    slowActive = false;
+    servoWrite(targetA);
+    sendMsg("SERVO_SET angle=%d\n", targetA);
+    return;
+  }
+  if (upper == "DETACH" || upper == "RELAX") {
+    slowActive = false;
+    servo.detach();
+    sendMsg("SERVO_DETACHED (RELAXED)\n");
     return;
   }
 
@@ -385,15 +427,44 @@ void updateState() {
 
   switch (state) {
     case RUNNING:
-      // Chi kich hoat khi CO LON MOI DEN (chuyen tu khong can sang co can)
-      if (lastIR != OBSTACLE_STATE && ir == OBSTACLE_STATE) {
+      if (manualStopped) {
+        motorOff();
+        irBlockStartTime = 0;
+        break;
+      }
+      // Neu tat AI: giu servo o HOME, cho lon di qua tu do, khong chan khong gat
+      if (!aiEnabled) {
+        motorOn();
+        irBlockStartTime = 0;
+        break;
+      }
+      // Bat buoc cam bien phai CLEAR (khong vat can) it nhat 1 lan truoc khi chap nhan don lon moi
+      // (chong triet de tinh trang ket cam bien gay tu dong chan lien tuc trong vo han)
+      if (irMustClearFirst) {
+        if (ir != OBSTACLE_STATE) {
+          irMustClearFirst = false; // Mat doc da thong thoang, san sang don lon moi
+        }
+        motorOn();
+        irBlockStartTime = 0;
+        break;
+      }
+      // Chống nhiễu quang học (Debounce):
+      // Cảm biến phải bị chắn liên tục >= IR_DEBOUNCE_MS (150ms) mới kích hoạt,
+      // triệt tiêu 100% xung nhiễu điện từ cuộn dây động cơ và vết xước đai băng tải.
+      if (ir == OBSTACLE_STATE) {
+        if (irBlockStartTime == 0) {
+          irBlockStartTime = millis();
+        } else if (millis() - irBlockStartTime >= IR_DEBOUNCE_MS) {
+          irBlockStartTime = 0;
+          irMustClearFirst = true; // Kich hoat xong phai cho mat doc thong thoang moi nhan tiep
 #if SLOW_FEED_ENABLE
-        // lon cham hong ngoai -> quay 2 giai doan nhe nhang om lon
-        setState(FEEDING);
+          setState(FEEDING);
 #else
-        setState(WAITING);
+          setState(WAITING);
 #endif
+        }
       } else {
+        irBlockStartTime = 0;
         motorOn();
       }
       break;

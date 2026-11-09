@@ -313,19 +313,31 @@ export default function App() {
                 <div><span>Inspection</span><strong>{isProcessing ? "ACTIVE" : "PAUSED"}</strong></div>
                 <div><span>Last verdict</span><strong className={status?.last_verdict === "NG" ? "text-ng" : "text-good"}>{status?.last_verdict || "—"}</strong></div>
               </div>
-              <div className="action-stack">
+              <div className="action-stack" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <motion.button
                   className={`primary-action ${isProcessing ? "is-pause" : ""}`}
                   type="button"
                   disabled={busy || Boolean(apiError)}
                   whileHover={reduceMotion ? undefined : { y: -1 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.985 }}
-                  onClick={() => submitAction(isProcessing ? "/control/stop" : "/control/start", isProcessing ? "Đã tạm dừng kiểm tra." : "Đã bật kiểm tra.")}
+                  onClick={() => submitAction(isProcessing ? "/control/stop" : "/control/start", isProcessing ? "Đã tạm dừng AI." : "Đã bật AI.")}
                 >
                   {isProcessing ? <Pause size={18} weight="fill" aria-hidden="true" /> : <Play size={18} weight="fill" aria-hidden="true" />}
-                  {busy ? "Đang cập nhật…" : isProcessing ? "Tạm dừng kiểm tra" : "Bắt đầu kiểm tra"}
+                  {busy ? "Đang cập nhật…" : isProcessing ? "Dừng phân tích AI" : "Bật phân tích AI"}
                 </motion.button>
-                <p className="action-hint">Thao tác này bật/tắt phân tích AI; điều khiển cơ cấu vẫn do ESP xử lý.</p>
+
+                <motion.button
+                  className={`primary-action ${status?.conveyor === "running" ? "is-pause" : ""}`}
+                  type="button"
+                  disabled={busy || Boolean(apiError)}
+                  style={{ background: status?.conveyor === "running" ? "#dc2626" : "#059669" }}
+                  whileHover={reduceMotion ? undefined : { y: -1 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+                  onClick={() => submitAction(status?.conveyor === "running" ? "/conveyor/stop" : "/conveyor/start", status?.conveyor === "running" ? "Đã dừng băng tải." : "Đã chạy băng tải.")}
+                >
+                  {status?.conveyor === "running" ? "Dừng băng tải" : "Chạy băng tải"}
+                </motion.button>
+                <p className="action-hint">Điều khiển độc lập: Băng tải (Motor) và Phân tích AI (Camera/Servo).</p>
               </div>
             </section>
 

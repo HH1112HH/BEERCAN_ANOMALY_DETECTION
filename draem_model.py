@@ -183,29 +183,46 @@ class DRAEM:
         }
 
         if need_heatmap:
+            # 1. Ảnh tái tạo từ Reconstructive Net (loại bỏ hoàn toàn khuyết tật)
+            rec_np = np.clip(rec[0].cpu().numpy().transpose(1, 2, 0), 0.0, 1.0)
+            rec_bgr = cv2.cvtColor((rec_np * 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
+
+            # 2. Bản đồ lỗi Discriminative Net (chuẩn bài báo)
+            pm = pred_mask[0, 0].cpu().numpy()
+
             # 👉 BÍ QUYẾT TRIỆT TIÊU VÒNG SÁNG: Hiệu số tái tạo giữa ảnh gốc và ảnh tái tạo
             diff_map = torch.abs(input_tensor - rec)[0].cpu().numpy().mean(axis=0)
             norm_map = np.clip(diff_map / (self.threshold * 0.3 + 1e-6), 0.0, 1.0)
 
             # Mặt nạ thân lon loại bỏ nền ngoài
             roi_256 = cv2.resize(roi, (self.img_size, self.img_size))
-            norm_map[roi_256.sum(axis=2) == 0] = 0.0
+            can_mask = (roi_256.sum(axis=2) > 0)
+            norm_map[~can_mask] = 0.0
 
-            heatmap = cv2.applyColorMap((norm_map * 255).astype(np.uint8), cv2.COLORMAP_JET)
-            heatmap[roi_256.sum(axis=2) == 0] = 0
+            # Bản đồ nhiệt thuần túy chuẩn khoa học (JET):
+            # Vùng bình thường (norm=0) -> XANH DƯƠNG (Cold)
+            # Vùng khuyết tật (norm->1) -> ĐỎ/VÀNG RỰC (Hot)
+            # Nền ngoài thân lon -> ĐEN
+            heatmap_jet = cv2.applyColorMap((norm_map * 255).astype(np.uint8), cv2.COLORMAP_JET)
+            heatmap_jet[~can_mask] = 0
 
-            # Phủ màu thông minh: chỉ phủ heatmap lên các vị trí lỗi (trên ngưỡng nhiễu 0.25)
-            # Vùng lon bình thường giữ nguyên màu ảnh gốc, không bị ám xanh toàn bộ
-            alpha = np.clip((norm_map - 0.25) / 0.75, 0.0, 1.0)[:, :, np.newaxis]
-            clean_overlay = ((1.0 - alpha * 0.75) * roi_256 + (alpha * 0.75) * heatmap).astype(np.uint8)
+            # Ảnh phủ nhiệt bán trong suốt (Overlay)
+            overlay = cv2.addWeighted(roi_256, 0.55, heatmap_jet, 0.45, 0)
+            overlay[~can_mask] = 0
 
             if mask is not None and mask.size > 0:
                 if mask.shape[:2] != (self.img_size, self.img_size):
                     m_resized = cv2.resize(mask.astype(np.uint8), (self.img_size, self.img_size), interpolation=cv2.INTER_NEAREST)
                 else:
                     m_resized = mask
-                clean_overlay[m_resized == 0] = 0
+                overlay[m_resized == 0] = 0
+                heatmap_jet[m_resized == 0] = 0
 
-            result["heatmap"] = cv2.resize(clean_overlay, (roi.shape[1], roi.shape[0]), interpolation=cv2.INTER_LINEAR)
+            h_orig, w_orig = roi.shape[:2]
+            result["recon_img"] = rec_bgr
+            result["discr_map"] = pm
+            result["pure_heatmap"] = cv2.resize(heatmap_jet, (w_orig, h_orig), interpolation=cv2.INTER_LINEAR)
+            result["overlay"] = cv2.resize(overlay, (w_orig, h_orig), interpolation=cv2.INTER_LINEAR)
+            result["heatmap"] = result["overlay"]
 
         return result

@@ -17,6 +17,8 @@ from camera_service import CameraService, CameraConfig
 from detector import YOLODetector
 from classifier import Classifier
 from conveyor_controller import ConveyorController
+import db_manager as db
+import image_logger
 
 # Anomaly models
 from draem_model import DRAEM
@@ -98,7 +100,14 @@ if not conveyor.sock:
 else:
     logger.info(f"ESP connected at {conveyor.host}:{conveyor.port}")
 
-history = deque(maxlen=100)
+# Initialize database and restore active session
+db.init_db()
+active_session = db.get_or_create_active_session()
+sess_stats = db.get_session_stats(active_session["id"])
+classifier.restore_counts(sess_stats["last_can_number"], sess_stats["good"], sess_stats["ng"])
+history = deque(db.get_session_records(active_session["id"]), maxlen=500)
+logger.info(f"Loaded active test session #{active_session['id']}: {active_session['name']} (Count: {sess_stats['total']}/{active_session['target_count']})")
+
 capture_dir = Path("captures")
 capture_dir.mkdir(exist_ok=True)
 results_dir = Path("results")
@@ -121,6 +130,19 @@ inspect_delay = cfg["camera"].get("inspect_delay", 1.0)
 def save_inspection_result(data):
     results_fh.write(json.dumps(data) + "\n")
     results_fh.flush()
+    try:
+        db.save_record(
+            session_id=active_session["id"],
+            can_number=data.get("id", 0),
+            timestamp=data.get("timestamp", datetime.now().strftime("%H:%M:%S")),
+            verdict=data.get("verdict", "NG"),
+            score=data.get("score", 0.0),
+            defects=data.get("defects", []),
+            details=data.get("details", {}),
+            image_file=data.get("image_file")
+        )
+    except Exception as e:
+        logger.error(f"Error saving to sqlite: {e}")
 
 def update_display(frame, text, color=(255, 255, 255)):
     global display_frame
@@ -173,32 +195,16 @@ def do_inspection(trigger_time: float, retry_detect: bool = True):
             dets = detector.detect(frame)
 
     if not dets:
-        logger.warning("No product detected after retry -> NG")
-        conveyor.send("NG")
-        last_verdict = "NG"
-        last_status_text = "No detection -> NG"
-        ins_result = classifier.classify(frame if frame is not None else np.zeros((100, 100, 3), dtype=np.uint8), {
-            "algo": "yolo", "defect": True, "score": 1.0, "reason": "No product detected"
-        })
-        result_data = {
-            "id": ins_result.product_id,
-            "timestamp": datetime.fromtimestamp(ins_result.timestamp).strftime("%H:%M:%S"),
-            "verdict": "NG",
-            "yolo_confidence": 0,
-            "anomaly_score": 1.0,
-            "draem_score": None,
-            "defects": ["no_detection"],
-            "score": 1.0,
-            "details": {"reason": "No product detected by YOLO after retry"},
-        }
-        history.append(result_data)
-        save_inspection_result(result_data)
+        logger.warning("No product detected in inspection zone (False trigger) -> Sending OK to clear gate safely")
+        conveyor.send("OK")
+        last_verdict = ""
+        last_status_text = "Kich hoat ao (Khong co lon) -> Mo can gat"
         if frame is not None:
-            cv2.putText(frame, "NO DETECT (NG)", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.putText(frame, "NO CAN DETECTED -> AUTO CLEAR", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (100, 200, 255), 2)
             with display_lock:
                 display_frame = frame
-        time.sleep(1.5)
+        time.sleep(1.0)
         conveyor.clear_buffer()
         return
 
@@ -275,13 +281,26 @@ def do_inspection(trigger_time: float, retry_detect: bool = True):
     with display_lock:
         display_frame = result_display
 
-    if verdict == "NG":
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        cv2.imwrite(str(capture_dir / f"{ts}_result.jpg"), result_display)
-        if heatmap is not None:
-            cv2.imwrite(str(capture_dir / f"{ts}_heatmap.jpg"), heatmap)
-        cv2.imwrite(str(capture_dir / f"{ts}_roi.jpg"), roi)
-        logger.info(f"Saved NG capture: {ts}")
+    card_filename = None
+    try:
+        threshold_val = draem.threshold if draem else 0.25
+        card_filename = image_logger.create_scientific_analysis_card(
+            can_number=ins_result.product_id,
+            verdict=verdict,
+            score=float(model_res.get("score", 0.0)),
+            threshold=threshold_val,
+            yolo_conf=float(conf),
+            roi=roi,
+            recon_img=model_res.get("recon_img"),
+            discr_map=model_res.get("discr_map"),
+            pure_heatmap=model_res.get("pure_heatmap"),
+            heatmap_overlay=(model_res.get("overlay") if model_res.get("overlay") is not None else heatmap),
+            raw_frame=frame,
+            timestamp_str=datetime.fromtimestamp(ins_result.timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        )
+        logger.info(f"Saved analysis card for Can #{ins_result.product_id} ({verdict}): {card_filename}")
+    except Exception as e:
+        logger.error(f"Error creating scientific card: {e}")
 
     result_data = {
         "id": ins_result.product_id,
@@ -293,6 +312,7 @@ def do_inspection(trigger_time: float, retry_detect: bool = True):
         "defects": ins_result.details["defects_found"],
         "score": ins_result.score,
         "details": ins_result.details["algorithm_results"],
+        "image_file": card_filename,
     }
     history.append(result_data)
 
@@ -318,10 +338,15 @@ def inspection_worker():
 
     while running:
         if not processing_enabled:
-            last_status_text = "Processing disabled"
+            last_status_text = "Processing disabled (Live preview only)"
+            if conveyor.is_connected():
+                msg = conveyor.read_line(timeout=0.01)
+                if msg and ("TRIGGER_CAMERA" in msg or "WAITING_INSPECTION" in msg):
+                    logger.info("Inspection disabled: letting can pass without grading")
+                    conveyor.send("OK")
             frame = camera.get_frame()
-            update_display(frame, "Processing disabled", (0, 0, 255))
-            time.sleep(0.1)
+            update_display(frame, "Live Preview (AI Idle)", (100, 200, 255))
+            time.sleep(0.05)
             continue
 
         if not conveyor.is_connected():
@@ -336,7 +361,7 @@ def inspection_worker():
         last_status_text = "Waiting for product..."
 
         trigger_time = None
-        while running:
+        while running and processing_enabled:
             msg = conveyor.read_line(timeout=0.02)
             if msg:
                 if "TRIGGER_CAMERA" in msg or "WAITING_INSPECTION" in msg:
@@ -350,7 +375,7 @@ def inspection_worker():
             frame = camera.get_frame()
             update_display(frame, "Waiting for product signal from ESP...", (200, 200, 200))
 
-        if trigger_time is None:
+        if not processing_enabled or trigger_time is None:
             continue
 
         try:
@@ -399,6 +424,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Industrial Defect Detection", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/captures", StaticFiles(directory="captures"), name="captures")
 
 
 def frame_generator():
@@ -448,18 +474,61 @@ async def get_status():
         "draem_threshold": draem.threshold if draem else 0.40,
         "patchcore_threshold": patch_core.threshold if patch_core else 0.087,
         "conf_threshold": detector.conf,
+        "session_id": active_session["id"],
+        "session_name": active_session["name"],
+        "target_count": active_session.get("target_count", 100),
     }
 
 
 @app.get("/history")
 async def get_history():
-    return list(history)[-50:]
+    return list(history)
+
+
+@app.post("/session/new")
+async def new_session(data: dict = {}):
+    global active_session
+    name = data.get("name")
+    target = int(data.get("target_count", 100))
+    active_session = db.create_new_session(name=name, target_count=target)
+    classifier.reset()
+    history.clear()
+    logger.info(f"Created new session: {active_session['name']} (target: {target})")
+    return {"status": "ok", "session": active_session}
+
+
+@app.get("/session/export")
+async def export_csv():
+    from fastapi.responses import Response
+    csv_data = db.export_session_csv_text(active_session["id"])
+    filename = f"report_session_{active_session['id']}.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@app.post("/record/delete_last")
+async def delete_last_record():
+    deleted = db.delete_last_record(active_session["id"])
+    if not deleted:
+        return {"status": "error", "message": "Không có lon nào để xóa"}
+    sess_stats = db.get_session_stats(active_session["id"])
+    classifier.restore_counts(sess_stats["last_can_number"], sess_stats["good"], sess_stats["ng"])
+    global history
+    history = deque(db.get_session_records(active_session["id"]), maxlen=500)
+    logger.info(f"Deleted last record #{deleted['can_number']} ({deleted['verdict']}). Restored count to {sess_stats['total']}")
+    return {"status": "ok", "deleted": deleted, "stats": sess_stats}
 
 
 @app.post("/control/start")
 async def control_start():
     global processing_enabled
     processing_enabled = True
+    if conveyor.is_connected():
+        conveyor.send("AI_ON")
+    logger.info("AI inspection enabled")
     return {"status": "started"}
 
 
@@ -467,6 +536,9 @@ async def control_start():
 async def control_stop():
     global processing_enabled
     processing_enabled = False
+    if conveyor.is_connected():
+        conveyor.send("AI_OFF")
+    logger.info("AI inspection disabled")
     return {"status": "stopped"}
 
 
@@ -475,9 +547,10 @@ async def conveyor_start():
     global conveyor_running
     if not conveyor.is_connected():
         return {"status": "error", "message": "Conveyor controller not connected"}
+    conveyor.send("RESET")
     conveyor.send("START")
     conveyor_running = True
-    logger.info("Conveyor started")
+    logger.info("Conveyor started (fault cleared)")
     return {"status": "ok", "message": "Conveyor started"}
 
 
@@ -530,9 +603,13 @@ async def set_threshold(data: dict):
 
 @app.post("/reset")
 async def reset_counter():
+    global active_session
+    active_session = db.create_new_session(target_count=active_session.get("target_count", 100))
     classifier.reset()
     history.clear()
-    return {"status": "reset"}
+    if conveyor.is_connected():
+        conveyor.send("RESET")
+    return {"status": "reset", "session": active_session}
 
 
 if __name__ == "__main__":

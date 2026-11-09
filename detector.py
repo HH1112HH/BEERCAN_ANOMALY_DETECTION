@@ -59,7 +59,7 @@ class YOLODetector:
         boxes = r.boxes
         fh, fw = frame.shape[:2]
 
-        # Lọc các bounding box nằm trong trạm kiểm tra, sắp xếp ưu tiên lon gần tâm trạm nhất
+        # Lọc các bounding box nằm trong trạm kiểm tra, loại bỏ nhiễu mép viền camera
         candidate_boxes = []
         for i in range(len(boxes)):
             conf = float(boxes.conf[i])
@@ -69,24 +69,22 @@ class YOLODetector:
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(fw, x2), min(fh, y2)
 
+            bw = x2 - x1
+            bh = y2 - y1
             bcx = (x1 + x2) // 2
             bcy = (y1 + y2) // 2
 
-            # Chỉ nhận lon nằm trong vùng trạm kiểm tra (bỏ qua lon cũ ở mép ra băng chuyền)
-            if self.zone_x1 <= bcx <= self.zone_x2 and self.zone_y1 <= bcy <= self.zone_y2:
-                dist = np.hypot(bcx - self.station_cx, bcy - self.station_cy)
+            # Lon thật phải có:
+            # 1. Độ tin cậy YOLO cao (conf >= 0.68 - lon thật luôn >= 0.85, bóng băng tải chỉ 0.50-0.62)
+            # 2. Kích thước chuẩn trên khung hình Dahua (bw, bh >= 420 px - lon thật là 700-800px)
+            # 3. Nằm trong vùng trạm kiểm tra của băng chuyền (bỏ qua viền camera)
+            if conf >= 0.68 and bw >= 420 and bh >= 420 and (350 <= bcx <= fw - 350) and (120 <= bcy <= fh - 120):
+                dist = np.hypot(bcx - (fw // 2), bcy - (fh // 2))
                 candidate_boxes.append((dist, conf, cls, x1, y1, x2, y2))
 
-        # Nếu không có lon nào trong vùng chuẩn, kiểm tra các box khác
+        # Nếu không có lon hợp lệ nào ở trạm kiểm tra -> trả về rỗng (tránh nhận nhầm viền ống kính)
         if not candidate_boxes:
-            for i in range(len(boxes)):
-                conf = float(boxes.conf[i])
-                cls = int(boxes.cls[i])
-                x1, y1, x2, y2 = boxes.xyxy[i].tolist()
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                x1, y1 = max(0, x1), max(0, y1)
-                x2, y2 = min(fw, x2), min(fh, y2)
-                candidate_boxes.append((9999.0, conf, cls, x1, y1, x2, y2))
+            return detections
 
         # Sắp xếp ưu tiên lon ở gần tâm trạm nhất
         candidate_boxes.sort(key=lambda item: item[0])
@@ -138,6 +136,15 @@ class YOLODetector:
             cv2.circle(circ_mask, (tcw // 2, tch // 2), can_r, 255, -1)
             roi = cv2.bitwise_and(tight_crop, tight_crop, mask=circ_mask)
             mask = circ_mask
+
+            # Kiểm tra quang phổ bề mặt nhôm: Nắp lon kim loại sáng trắng (độ sáng trung bình >= 125).
+            # Băng tải xanh hoặc bóng râm có độ sáng chỉ 60-80 -> Loại bỏ 100% trường hợp không có lon.
+            circ_pixels = tight_crop[circ_mask > 0]
+            if circ_pixels.size > 0:
+                mean_bright = float(circ_pixels.mean())
+                if mean_bright < 125.0:
+                    logger.warning(f"Rejected non-can surface: mean brightness {mean_bright:.1f} < 125.0 (empty belt)")
+                    continue
 
             detections.append({
                 "bbox": [x1, y1, x2, y2],
