@@ -11,7 +11,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+import sys
 from datetime import datetime
+
+# Add src/ to sys.path so all core modules are loaded seamlessly
+SRC_DIR = Path(__file__).resolve().parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from camera_service import CameraService, CameraConfig
 from detector import YOLODetector

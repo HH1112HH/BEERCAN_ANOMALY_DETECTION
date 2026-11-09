@@ -1,3 +1,2 @@
 @echo off
-python cap.py %*
-
+python tools/cap.py %*

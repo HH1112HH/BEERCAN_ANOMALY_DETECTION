@@ -17,6 +17,10 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+# Ensure working directory is project root
+ROOT_DIR = Path(__file__).resolve().parent.parent
+os.chdir(ROOT_DIR)
+
 
 def crop_circular_snug(img: np.ndarray, target_size=(256, 256)):
     """
