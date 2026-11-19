@@ -16,6 +16,10 @@ esp:
 server:
   host: 0.0.0.0
   port: 5004
+  # Remote/MJPEG stream tuning: lower = less lag on slow Internet links.
+  stream_width: 640
+  stream_fps: 8
+  stream_quality: 65
 yolo:
   confidence: 0.65
   device: cuda:0

@@ -2,14 +2,15 @@ import cv2
 import numpy as np
 import yaml
 import json
+import gzip
 import logging
 import time
 import threading
 from collections import deque
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 import sys
 from datetime import datetime
@@ -115,6 +116,14 @@ last_status_text = "Starting..."
 
 DETECT_CONF = cfg["yolo"].get("confidence", 0.45)
 inspect_delay = cfg["camera"].get("inspect_delay", 1.0)
+
+# MJPEG stream tuning. A full-resolution 30 FPS MJPEG feed easily needs
+# 3-5 MB/s, which saturates Tailscale Funnel / home upload links and makes
+# remote dashboards lag. Lower these values if the stream is still choppy.
+SERVER_CFG = cfg.get("server", {})
+STREAM_WIDTH = int(SERVER_CFG.get("stream_width", 640))  # 0 = keep original size
+STREAM_FPS = max(1.0, float(SERVER_CFG.get("stream_fps", 8)))
+STREAM_QUALITY = int(SERVER_CFG.get("stream_quality", 65))
 
 
 def save_inspection_result(data):
@@ -413,19 +422,62 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/captures", StaticFiles(directory="captures"), name="captures")
 
 
-def frame_generator():
-    last = None
+stream_jpeg = None
+stream_seq = 0
+stream_cond = threading.Condition()
+
+
+def stream_encoder_worker():
+    """Encode the latest dashboard frame once and share it with all viewers.
+
+    Encoding inside every StreamingResponse generator would use one CPU core
+    per viewer and upload the full-resolution feed. One lower-bitrate stream
+    keeps remote (Internet) dashboards responsive.
+    """
+    global stream_jpeg, stream_seq
+    last_frame = None
+    interval = 1.0 / STREAM_FPS
     while running:
+        started = time.time()
         with display_lock:
             frame = display_frame
-            if frame is None or frame is last:
-                time.sleep(0.05)
+        if frame is None or frame is last_frame:
+            time.sleep(0.02)
+            continue
+        last_frame = frame
+
+        if STREAM_WIDTH > 0 and frame.shape[1] > STREAM_WIDTH:
+            new_h = max(1, int(frame.shape[0] * STREAM_WIDTH / frame.shape[1]))
+            frame = cv2.resize(frame, (STREAM_WIDTH, new_h), interpolation=cv2.INTER_AREA)
+
+        ok, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_QUALITY])
+        if ok:
+            with stream_cond:
+                stream_jpeg = jpeg.tobytes()
+                stream_seq += 1
+                stream_cond.notify_all()
+
+        elapsed = time.time() - started
+        if elapsed < interval:
+            time.sleep(interval - elapsed)
+
+
+def frame_generator():
+    last_seq = -1
+    while running:
+        with stream_cond:
+            if stream_seq == last_seq:
+                stream_cond.wait(timeout=1.0)
                 continue
-            last = frame
-        ret, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        if ret:
-            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
-        time.sleep(0.03)
+            data = stream_jpeg
+            last_seq = stream_seq
+        if data:
+            yield (b"--frame\r\nContent-Type: image/jpeg\r\n"
+                   b"Content-Length: " + str(len(data)).encode() + b"\r\n\r\n"
+                   + data + b"\r\n")
+
+
+threading.Thread(target=stream_encoder_worker, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -439,7 +491,11 @@ async def index():
 
 @app.get("/video")
 async def video_feed():
-    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(
+        frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 @app.get("/status")
@@ -466,8 +522,15 @@ async def get_status():
 
 
 @app.get("/history")
-async def get_history():
-    return list(history)
+async def get_history(request: Request):
+    # Compact JSON + gzip keeps the 2-5s polling cheap on slow/mobile links.
+    payload = json.dumps(list(history), separators=(",", ":")).encode("utf-8")
+    headers = {"Cache-Control": "no-store"}
+    if len(payload) > 1024 and "gzip" in request.headers.get("accept-encoding", "").lower():
+        payload = gzip.compress(payload, compresslevel=5)
+        headers["Content-Encoding"] = "gzip"
+        headers["Vary"] = "Accept-Encoding"
+    return Response(content=payload, media_type="application/json", headers=headers)
 
 
 @app.post("/session/new")

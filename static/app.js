@@ -1,6 +1,8 @@
 let historyData = [];
 let polling = true;
 let sliderInitialized = false;
+let statusInFlight = false;
+let historyInFlight = false;
 
 function showToast(message, type) {
   const toast = document.getElementById('toast');
@@ -56,6 +58,8 @@ function setAIStateUI(isAiActive) {
 }
 
 async function fetchStatus() {
+  if (statusInFlight) return;
+  statusInFlight = true;
   try {
     const res = await fetch('/status');
     const data = await res.json();
@@ -116,10 +120,14 @@ async function fetchStatus() {
     }
   } catch (e) {
     console.error('Status fetch error:', e);
+  } finally {
+    statusInFlight = false;
   }
 }
 
 async function fetchHistory() {
+  if (historyInFlight) return;
+  historyInFlight = true;
   try {
     const res = await fetch('/history');
     const data = await res.json();
@@ -128,6 +136,8 @@ async function fetchHistory() {
     renderHistory(data);
   } catch (e) {
     console.error('History fetch error:', e);
+  } finally {
+    historyInFlight = false;
   }
 }
 
@@ -314,9 +324,15 @@ async function updateThreshold(algo, value) {
 }
 window.updateThreshold = updateThreshold;
 
-// Polling
-setInterval(() => { if (polling) fetchStatus(); }, 1200);
-setInterval(() => { if (polling) fetchHistory(); }, 2000);
+// Polling (paused while the tab is hidden and never overlapping)
+setInterval(() => { if (polling && !document.hidden) fetchStatus(); }, 1500);
+setInterval(() => { if (polling && !document.hidden) fetchHistory(); }, 5000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    fetchStatus();
+    fetchHistory();
+  }
+});
 
 fetchStatus();
 fetchHistory();
